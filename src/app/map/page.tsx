@@ -7,7 +7,7 @@ import { t } from '@/lib/i18n';
 import { MapModelSchema } from '@/lib/map/schema';
 import type { DecisionInput } from '@/lib/map/engine';
 import { exampleDecisionInput } from '@/lib/examples/exampleDecision';
-import type { MapEdge, MapModel } from '@/lib/map/types';
+import type { MapEdge, MapModel, MapNode } from '@/lib/map/types';
 import type { DecisionRecord } from '@/lib/history/types';
 import { summarizeMap } from '@/lib/history/summarize';
 import { addRecord, loadHistory, updateRecord } from '@/lib/history/storage';
@@ -258,8 +258,8 @@ export default function MapPage() {
   const optionStaggerStep = 60;
   const buildButtonDelay = optionStaggerBase + (input.options.length - 1) * optionStaggerStep + 80;
 
-  const allNodes = mapModel?.nodes ?? [];
-  const allEdges = mapModel?.edges ?? [];
+  const allNodes = useMemo(() => mapModel?.nodes ?? [], [mapModel]);
+  const allEdges = useMemo(() => mapModel?.edges ?? [], [mapModel]);
 
   const handleOptionChange = (index: number, field: 'label' | 'description', value: string) => {
     setInput((prev) => {
