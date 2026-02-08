@@ -37,6 +37,11 @@ const resolveImportance = (nodeType: MapNode['type'], tags: string[] = []): Node
   return 'secondary';
 };
 
+type EdgeData = {
+  optionId?: string;
+  label?: string;
+};
+
 const getLayoutedElements = (nodes: MapNode[], edges: MapEdge[]) => {
   const visibleMap = new Map<string, string>();
   const hiddenSet = new Set<string>();
@@ -109,7 +114,7 @@ const getLayoutedElements = (nodes: MapNode[], edges: MapEdge[]) => {
         }
       };
     })
-    .filter(Boolean) as unknown as { id: string; source: string; target: string; type: string; data: unknown }[];
+    .filter(Boolean) as Edge<EdgeData>[];
 
   return { nodes: layoutedNodes, edges: layoutedEdges, visibleMap };
 };
@@ -188,7 +193,7 @@ function MergedNode({ data }: NodeProps<NodeData>) {
   );
 }
 
-function OptionEdge({ id, sourceX, sourceY, targetX, targetY, data, selected }: EdgeProps) {
+function OptionEdge({ id, sourceX, sourceY, targetX, targetY, data, selected }: EdgeProps<EdgeData>) {
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
     sourceY,
@@ -249,7 +254,7 @@ export const MapFlow = forwardRef<MapFlowHandle, MapFlowProps>(function MapFlow(
 ) {
   const layouted = useMemo(() => getLayoutedElements(model.nodes, model.edges), [model]);
   const [nodes, setNodes, onNodesChange] = useNodesState(layouted.nodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(layouted.edges);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<EdgeData>(layouted.edges);
   const [flowInstance, setFlowInstance] = useState<{
     fitView: (args?: { padding?: number; nodes?: Node[] }) => void;
     setCenter: (x: number, y: number, opts?: { zoom?: number; duration?: number }) => void;
@@ -440,7 +445,7 @@ export const MapFlow = forwardRef<MapFlowHandle, MapFlowProps>(function MapFlow(
   );
 
   const handleEdgeClick = useCallback(
-    (_: React.MouseEvent, edge: Edge) => {
+    (_: React.MouseEvent, edge: Edge<EdgeData>) => {
       if (edge.data?.optionId) {
         onSelectOption(edge.data.optionId);
       }
@@ -466,7 +471,7 @@ export const MapFlow = forwardRef<MapFlowHandle, MapFlowProps>(function MapFlow(
     [onSelectOption, pinnedNodeId, layouted.visibleMap, model.nodes, onFocusNode]
   );
 
-  const handleEdgeHover = useCallback((edge: Edge | null) => {
+  const handleEdgeHover = useCallback((edge: Edge<EdgeData> | null) => {
     if (edge?.data?.optionId) {
       setHoveredOptionId(edge.data.optionId);
     } else {
