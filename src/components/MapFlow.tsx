@@ -315,7 +315,7 @@ export const MapFlow = forwardRef<MapFlowHandle, MapFlowProps>(function MapFlow(
         onFocusNode?.(null);
       }
     }),
-    [flowInstance, nodes, layouted.visibleMap]
+    [flowInstance, nodes, layouted.visibleMap, onFocusNode]
   );
 
   const activeFocus = useMemo(() => {

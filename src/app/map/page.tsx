@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MapFlow, type MapFlowHandle } from '@/components/MapFlow';
 import { useSearchParams } from 'next/navigation';
 import { t } from '@/lib/i18n';
@@ -446,14 +446,14 @@ export default function MapPage() {
     setHistoryItems(next);
   };
 
-  const clearHighlight = (force = false) => {
+  const clearHighlight = useCallback((force = false) => {
     if (pinnedHighlight && !force) return;
     setHighlightMode('none');
     setHighlightQuery(null);
     setHighlightIds({ nodeIds: [], edgeIds: [] });
-  };
+  }, [pinnedHighlight]);
 
-  const computeHighlightIds = (tags?: string[], nodeIds?: string[], includeOptionEdges = true) => {
+  const computeHighlightIds = useCallback((tags?: string[], nodeIds?: string[], includeOptionEdges = true) => {
     const tagSet = new Set(tags ?? []);
     const nodesFromTags = allNodes
       .filter((node) => node.tags?.some((tag) => tagSet.has(tag)))
@@ -467,9 +467,9 @@ export default function MapPage() {
       .map((edge) => edge.id);
     const edgeIds = Array.from(new Set([...optionEdgeIds, ...relatedEdgeIds]));
     return { nodeIds: Array.from(nodeIdSet), edgeIds };
-  };
+  }, [allEdges, allNodes, selectedOptionId]);
 
-  const computeHighlightIdsWithPath = (tags?: string[], nodeIds?: string[]) => {
+  const computeHighlightIdsWithPath = useCallback((tags?: string[], nodeIds?: string[]) => {
     const base = computeHighlightIds(tags, nodeIds, false);
     const nodeSet = new Set(base.nodeIds);
     const additionalEdgeIds: string[] = [];
@@ -491,7 +491,7 @@ export default function MapPage() {
     const nextNodeIds = Array.from(new Set([...base.nodeIds, ...additionalNodes]));
     const nextEdgeIds = Array.from(new Set([...base.edgeIds, ...additionalEdgeIds]));
     return { nodeIds: nextNodeIds, edgeIds: nextEdgeIds };
-  };
+  }, [allEdges, allNodes, computeHighlightIds]);
 
   const applyHighlight = (
     mode: 'closedFuture' | 'reason' | 'metric',
@@ -560,7 +560,7 @@ export default function MapPage() {
     if (!highlightQuery) return;
     const ids = computeHighlightIds(highlightQuery.tags, highlightQuery.nodeIds);
     setHighlightIds(ids);
-  }, [highlightQuery, selectedOptionId, mapModel]);
+  }, [computeHighlightIds, highlightQuery]);
 
   useEffect(() => {
     setHistoryItems(loadHistory());
@@ -586,7 +586,7 @@ export default function MapPage() {
     requestAnimationFrame(() => {
       mapFlowRef.current?.fit();
     });
-  }, [searchParams]);
+  }, [clearHighlight, searchParams]);
 
   return (
     <main className="min-h-screen bg-transparent">

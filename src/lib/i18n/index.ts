@@ -6,7 +6,7 @@ export type I18nKey = keyof typeof dict;
 
 type Params = Record<string, string | number>;
 
-export function t(key: I18nKey, params?: Params) {
+export function t(key: I18nKey, params?: Params): string {
   const template = dict[key];
   if (!params) return template;
   return Object.entries(params).reduce((acc, [paramKey, value]) => {
