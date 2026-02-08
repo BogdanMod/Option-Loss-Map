@@ -235,9 +235,12 @@ type MapFlowProps = {
   selectedOptionId: string;
   onSelectOption: (optionId: string) => void;
   onFocusNode?: (node: MapNode | null) => void;
+  onNodeHover?: () => void;
+  onNodeClick?: () => void;
   focusEnabled: boolean;
   highlightMode: 'none' | 'closedFuture' | 'reason' | 'metric';
   highlightIds: { nodeIds: string[]; edgeIds: string[] };
+  legendFocus?: NodeImportance | null;
 };
 
 export type MapFlowHandle = {
@@ -249,7 +252,7 @@ export type MapFlowHandle = {
 };
 
 export const MapFlow = forwardRef<MapFlowHandle, MapFlowProps>(function MapFlow(
-  { model, selectedOptionId, onSelectOption, onFocusNode, focusEnabled, highlightMode, highlightIds },
+  { model, selectedOptionId, onSelectOption, onFocusNode, onNodeHover, onNodeClick, focusEnabled, highlightMode, highlightIds, legendFocus },
   ref
 ) {
   const layouted = useMemo(() => getLayoutedElements(model.nodes, model.edges), [model]);
@@ -279,6 +282,20 @@ export const MapFlow = forwardRef<MapFlowHandle, MapFlowProps>(function MapFlow(
   }, [highlightIds.nodeIds, layouted.visibleMap]);
 
   const highlightEdgeIdSet = useMemo(() => new Set(highlightIds.edgeIds), [highlightIds.edgeIds]);
+
+  const legendFocusNodeIds = useMemo(() => {
+    if (!legendFocus) return null;
+    const ids = new Set<string>();
+    nodes.forEach((node) => {
+      const data = node.data as NodeData;
+      const importance = resolveImportance(node.type as MapNode['type'], data.tags ?? []);
+      if (importance === legendFocus) {
+        ids.add(node.id);
+      }
+    });
+    return ids;
+  }, [legendFocus, nodes]);
+  const legendActive = Boolean(legendFocusNodeIds);
 
   useEffect(() => {
     // Синхронизируем внутреннее состояние ReactFlow при обновлении модели.
@@ -359,27 +376,54 @@ export const MapFlow = forwardRef<MapFlowHandle, MapFlowProps>(function MapFlow(
         data: {
           ...node.data,
           importance: resolveImportance(node.type as MapNode['type'], (node.data as NodeData).tags),
-          isHighlighted: highlightActive
-            ? highlightNodeIdSet.has(node.id)
-            : node.data.optionId === selectedOptionId,
+          isHighlighted: legendActive
+            ? legendFocusNodeIds?.has(node.id) ?? false
+            : highlightActive
+              ? highlightNodeIdSet.has(node.id)
+              : node.data.optionId === selectedOptionId,
           isFocused: activeFocus ? activeFocus.nodeIds.has(node.id) : false
         },
-        style: highlightActive
-          ? { opacity: highlightNodeIdSet.has(node.id) ? 1 : 0.18 }
-          : hoverFocus
-            ? { opacity: hoverFocus.nodeIds.has(node.id) ? 1 : 0.3 }
-            : activeFocus
-              ? { opacity: activeFocus.nodeIds.has(node.id) ? 1 : 0.22 }
-              : focusId && node.data.optionId && node.data.optionId !== focusId
-                ? { opacity: 0.22 }
-                : { opacity: 1 }
+        style: legendActive
+          ? { opacity: legendFocusNodeIds?.has(node.id) ? 1 : 0.15 }
+          : highlightActive
+            ? { opacity: highlightNodeIdSet.has(node.id) ? 1 : 0.18 }
+            : hoverFocus
+              ? { opacity: hoverFocus.nodeIds.has(node.id) ? 1 : 0.3 }
+              : activeFocus
+                ? { opacity: activeFocus.nodeIds.has(node.id) ? 1 : 0.22 }
+                : focusId && node.data.optionId && node.data.optionId !== focusId
+                  ? { opacity: 0.22 }
+                  : { opacity: 1 }
       })),
-    [nodes, selectedOptionId, focusId, highlightActive, highlightNodeIdSet, activeFocus, hoverFocus]
+    [
+      nodes,
+      selectedOptionId,
+      focusId,
+      highlightActive,
+      highlightNodeIdSet,
+      activeFocus,
+      hoverFocus,
+      legendActive,
+      legendFocusNodeIds
+    ]
   );
 
   const decoratedEdges = useMemo(
     () =>
       edges.map((edge) => {
+        if (legendActive) {
+          const isActive =
+            legendFocusNodeIds?.has(edge.source) || legendFocusNodeIds?.has(edge.target);
+          return {
+            ...edge,
+            className: isActive ? 'rf-edge-selected' : '',
+            style: {
+              stroke: isActive ? 'rgba(120,140,255,0.45)' : 'rgba(120,140,255,0.14)',
+              strokeWidth: isActive ? 1.4 : 1,
+              opacity: isActive ? 0.9 : 0.15
+            }
+          };
+        }
         if (highlightActive) {
           const isHighlighted =
             highlightEdgeIdSet.has(edge.id) ||
@@ -441,7 +485,18 @@ export const MapFlow = forwardRef<MapFlowHandle, MapFlowProps>(function MapFlow(
           }
         };
       }),
-    [edges, selectedOptionId, focusId, highlightActive, highlightEdgeIdSet, highlightNodeIdSet, activeFocus, hoverFocus]
+    [
+      edges,
+      selectedOptionId,
+      focusId,
+      highlightActive,
+      highlightEdgeIdSet,
+      highlightNodeIdSet,
+      activeFocus,
+      hoverFocus,
+      legendActive,
+      legendFocusNodeIds
+    ]
   );
 
   const handleEdgeClick = useCallback(
@@ -455,6 +510,7 @@ export const MapFlow = forwardRef<MapFlowHandle, MapFlowProps>(function MapFlow(
 
   const handleNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
+      onNodeClick?.();
       const resolvedId = layouted.visibleMap.get(node.id) ?? node.id;
       if (pinnedNodeId === resolvedId) {
         setPinnedNodeId(null);
@@ -468,7 +524,7 @@ export const MapFlow = forwardRef<MapFlowHandle, MapFlowProps>(function MapFlow(
         onSelectOption(node.data.optionId);
       }
     },
-    [onSelectOption, pinnedNodeId, layouted.visibleMap, model.nodes, onFocusNode]
+    [onSelectOption, pinnedNodeId, layouted.visibleMap, model.nodes, onFocusNode, onNodeClick]
   );
 
   const handleEdgeHover = useCallback((edge: Edge<EdgeData> | null) => {
@@ -480,6 +536,9 @@ export const MapFlow = forwardRef<MapFlowHandle, MapFlowProps>(function MapFlow(
   }, []);
 
   const handleNodeHover = useCallback((node: Node | null) => {
+    if (node) {
+      onNodeHover?.();
+    }
     if (node?.data?.optionId) {
       setHoveredOptionId(node.data.optionId);
     } else {
@@ -492,7 +551,7 @@ export const MapFlow = forwardRef<MapFlowHandle, MapFlowProps>(function MapFlow(
         setHoveredNodeId(null);
       }
     }
-  }, [layouted.visibleMap, pinnedNodeId]);
+  }, [layouted.visibleMap, pinnedNodeId, onNodeHover]);
 
   const handleNodeDoubleClick = useCallback(
     (_: React.MouseEvent, node: Node) => {

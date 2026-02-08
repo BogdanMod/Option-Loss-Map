@@ -2,6 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MapFlow, type MapFlowHandle } from '@/components/MapFlow';
+import MapLegend, { type LegendFocus } from '@/components/MapLegend';
 import { useSearchParams } from 'next/navigation';
 import { t } from '@/lib/i18n';
 import { MapModelSchema } from '@/lib/map/schema';
@@ -12,6 +13,8 @@ import type { DecisionRecord } from '@/lib/history/types';
 import { summarizeMap } from '@/lib/history/summarize';
 import { addRecord, loadHistory, updateRecord } from '@/lib/history/storage';
 import { usePlan } from '@/lib/billing/usePlan';
+import { encodeSharePayload } from '@/lib/share/encode';
+import type { MapSharePayload } from '@/lib/share/mapPayload';
 
 const getConfidenceColor = (level: MapEdge['metrics']['confidence']) => {
   switch (level) {
@@ -172,11 +175,12 @@ function MapPageInner() {
   const mapFlowRef = useRef<MapFlowHandle | null>(null);
   const [showAllClosed, setShowAllClosed] = useState(false);
   const [historyItems, setHistoryItems] = useState<DecisionRecord[]>([]);
-  const [screenState, setScreenState] = useState<'input' | 'map' | 'analysis'>('input');
+  const [screenState, setScreenState] = useState<'empty' | 'input' | 'analysis'>('empty');
   const [isDemoView, setIsDemoView] = useState(false);
   const [activeOptionIndex, setActiveOptionIndex] = useState<number | null>(null);
   const [editorMode, setEditorMode] = useState<'mine' | 'example'>('mine');
   const prevInputRef = useRef<DecisionInput | null>(null);
+  const prevScreenStateRef = useRef<'empty' | 'input' | 'analysis'>('empty');
   const [highlightMode, setHighlightMode] = useState<'none' | 'closedFuture' | 'reason' | 'metric'>('none');
   const [highlightQuery, setHighlightQuery] = useState<{
     type: 'closedFuture' | 'reason' | 'metric';
@@ -196,6 +200,11 @@ function MapPageInner() {
   const focusDebounceRef = useRef<number | null>(null);
   const isHistoryLimitReached = historyItems.length >= features.historyLimit;
   const searchParams = useSearchParams();
+  const [legendFocus, setLegendFocus] = useState<LegendFocus | null>(null);
+  const [exportStatus, setExportStatus] = useState<'idle' | 'loading' | 'done'>('idle');
+  const [shareNotice, setShareNotice] = useState<string | null>(null);
+  const [hintState, setHintState] = useState({ hover: false, click: false, panel: false });
+  const [hintsReady, setHintsReady] = useState(false);
 
   const selectedOption = useMemo(
     () =>
@@ -260,6 +269,16 @@ function MapPageInner() {
 
   const allNodes = useMemo(() => mapModel?.nodes ?? [], [mapModel]);
   const allEdges = useMemo(() => mapModel?.edges ?? [], [mapModel]);
+  const selectedPathIds = useMemo(() => {
+    if (!mapModel || !selectedOptionId) return { nodeIds: [], edgeIds: [] };
+    const edges = mapModel.edges.filter((edge) => edge.optionId === selectedOptionId);
+    const nodeIds = new Set<string>();
+    edges.forEach((edge) => {
+      nodeIds.add(edge.source);
+      nodeIds.add(edge.target);
+    });
+    return { nodeIds: Array.from(nodeIds), edgeIds: edges.map((edge) => edge.id) };
+  }, [mapModel, selectedOptionId]);
 
   const handleOptionChange = (index: number, field: 'label' | 'description', value: string) => {
     setInput((prev) => {
@@ -356,6 +375,7 @@ function MapPageInner() {
   const handleViewExample = async () => {
     setIsBuilding(true);
     try {
+      prevScreenStateRef.current = screenState;
       if (!isDemoView) {
         prevInputRef.current = input;
       }
@@ -398,6 +418,7 @@ function MapPageInner() {
     setIsDemoView(false);
     setEditorMode('mine');
     setFocusedNode(null);
+    setScreenState(prevScreenStateRef.current || 'empty');
     if (prevInputRef.current) {
       setInput(prevInputRef.current);
     } else {
@@ -405,7 +426,6 @@ function MapPageInner() {
     }
     setMapModel(null);
     setSelectedOptionId('');
-    setScreenState('input');
   };
 
   const handleSaveHistory = () => {
@@ -567,6 +587,24 @@ function MapPageInner() {
   }, []);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const stored = window.localStorage.getItem('zercon_map_hints');
+      if (stored) {
+        const parsed = JSON.parse(stored) as { hover?: boolean; click?: boolean; panel?: boolean };
+        setHintState({
+          hover: Boolean(parsed.hover),
+          click: Boolean(parsed.click),
+          panel: Boolean(parsed.panel)
+        });
+      }
+    } catch {
+      // ignore
+    }
+    setHintsReady(true);
+  }, []);
+
+  useEffect(() => {
     const recordId = searchParams?.get('open');
     if (!recordId) return;
     const items = loadHistory();
@@ -588,10 +626,88 @@ function MapPageInner() {
     });
   }, [clearHighlight, searchParams]);
 
+  const persistHintState = useCallback((next: { hover: boolean; click: boolean; panel: boolean }) => {
+    setHintState(next);
+    try {
+      window.localStorage.setItem('zercon_map_hints', JSON.stringify(next));
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const markHintSeen = useCallback(
+    (key: 'hover' | 'click' | 'panel') => {
+      if (!hintsReady) return;
+      if (hintState[key]) return;
+      persistHintState({ ...hintState, [key]: true });
+    },
+    [hintState, hintsReady, persistHintState]
+  );
+
+  const buildSharePayload = useCallback((): MapSharePayload | null => {
+    if (!mapModel) return null;
+    return {
+      title: input.title,
+      context: input.currentStateText,
+      selectedOptionId,
+      selectedOptionLabel,
+      summary: {
+        optionLossPct: metrics?.optionLossPct ?? 0,
+        pnrFlag: metrics?.pnrFlag ?? false,
+        pnrText: metrics?.pnrText,
+        mainEffect: mainEffect || '',
+        totalFutureStates
+      },
+      map: mapModel,
+      highlightIds: selectedPathIds,
+      generatedAt: Date.now()
+    };
+  }, [input.currentStateText, input.title, mainEffect, mapModel, metrics, selectedOptionId, selectedOptionLabel, selectedPathIds, totalFutureStates]);
+
+  const handleExport = () => {
+    if (!mapModel || exportStatus === 'loading') return;
+    const payload = buildSharePayload();
+    if (!payload) return;
+    setExportStatus('loading');
+    const token = encodeSharePayload(payload);
+    const url = `${window.location.origin}/export/${token}?print=1`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+    window.setTimeout(() => setExportStatus('done'), 800);
+    window.setTimeout(() => setExportStatus('idle'), 2600);
+  };
+
+  const handleShare = () => {
+    if (!mapModel) return;
+    const payload = buildSharePayload();
+    if (!payload) return;
+    const token = encodeSharePayload(payload);
+    const url = `${window.location.origin}/share/map/${token}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+    navigator.clipboard?.writeText(url).catch(() => undefined);
+    setShareNotice(t('shareMapCopied'));
+    window.setTimeout(() => setShareNotice(null), 2200);
+  };
+
   return (
     <main className="min-h-screen bg-transparent">
       <div className={`w-full px-6 py-12 ${screenState === 'input' ? 'mx-auto max-w-[820px]' : 'max-w-none'}`}>
-        {screenState === 'input' ? (
+        {screenState === 'empty' ? (
+          <section className="flex min-h-[calc(100vh-8rem)] items-center justify-center ui-crossfade">
+            <div className="ui-section w-full max-w-[560px] px-8 py-10 text-center backdrop-blur">
+              <div className="text-[12px] uppercase tracking-[0.3em] text-white/50">ZER · CON</div>
+              <h1 className="mt-4 text-[24px] font-semibold text-white">{t('mapEmptyTitle')}</h1>
+              <p className="mt-3 text-[15px] text-white/60">{t('mapEmptySubtitle')}</p>
+              <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
+                <button type="button" className="ui-button-primary" onClick={handleViewExample}>
+                  {t('mapEmptyExample')}
+                </button>
+                <button type="button" className="ui-button-secondary" onClick={() => setScreenState('input')}>
+                  {t('mapEmptyStart')}
+                </button>
+              </div>
+            </div>
+          </section>
+        ) : screenState === 'input' ? (
           <section className="ui-section px-8 py-10 backdrop-blur ui-crossfade">
             <div className="space-y-2">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -791,13 +907,16 @@ function MapPageInner() {
             </div>
           </section>
         ) : (
-          <div className="grid min-h-[calc(100vh-3rem)] w-full grid-cols-[340px_minmax(0,1fr)] gap-8 ui-crossfade">
-            <aside className="flex flex-col gap-4">
+          <div className="grid min-h-[calc(100vh-3rem)] w-full grid-cols-[360px_minmax(0,1fr)] gap-8 ui-crossfade">
+            <aside className="flex flex-col gap-4" onMouseEnter={() => markHintSeen('panel')}>
               <div className="ui-section px-5 py-5 backdrop-blur">
                 <div className="ui-caption uppercase tracking-wide">{t('mapTitle')}</div>
                 <h2 className="mt-3 text-[18px] font-semibold text-white">{input.title}</h2>
                 <div className="mt-2 text-[13px] text-white/50">{input.currentStateText}</div>
                 {isDemoView ? <div className="mt-3 text-[12px] text-white/50">{t('demoLabel')}</div> : null}
+                {hintsReady && !hintState.panel ? (
+                  <div className="mt-3 text-[12px] text-white/50">{t('hintPanel')}</div>
+                ) : null}
               </div>
 
               <div className="ui-section px-5 py-5 backdrop-blur">
@@ -876,7 +995,18 @@ function MapPageInner() {
                       {t('saveDecision')}
                     </button>
                   )}
+                  <button type="button" className="ui-button-secondary" onClick={handleShare} disabled={!hasMap}>
+                    {t('shareMap')}
+                  </button>
+                  <button type="button" className="ui-button-secondary" onClick={handleExport} disabled={!hasMap}>
+                    {exportStatus === 'loading'
+                      ? t('exporting')
+                      : exportStatus === 'done'
+                        ? t('exportReady')
+                        : t('exportAction')}
+                  </button>
                 </div>
+                {shareNotice ? <div className="mt-2 text-[12px] text-white/50">{shareNotice}</div> : null}
               </div>
             </aside>
 
@@ -884,30 +1014,13 @@ function MapPageInner() {
               <div className="min-h-[calc(100vh-8rem)] flex-1 ui-section backdrop-blur ui-map-shell ui-crossfade">
                 <div className="ui-map-grid pointer-events-none z-0" />
                 <div className="ui-map-shimmer pointer-events-none z-0 ui-map-shimmer-active" />
-                <div className="ui-map-legend">
-                  <div className="text-[10px] uppercase tracking-wide text-white/40">
-                    {t('mapLegendTitle')}
+                <MapLegend active={legendFocus} onHover={setLegendFocus} />
+                {hintsReady && (!hintState.hover || !hintState.click) ? (
+                  <div className="ui-map-hints">
+                    {!hintState.hover ? <div>{t('hintNodeHover')}</div> : null}
+                    {!hintState.click ? <div>{t('hintNodeClick')}</div> : null}
                   </div>
-                  <div className="mt-2 grid gap-1 text-[11px] text-white/60">
-                    <div className="flex items-center gap-2">
-                      <span className="ui-legend-dot ui-legend-current" />
-                      {t('mapLegendCurrent')}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="ui-legend-dot ui-legend-primary" />
-                      {t('mapLegendPrimary')}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="ui-legend-dot ui-legend-secondary" />
-                      {t('mapLegendSecondary')}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="ui-legend-dot ui-legend-distant" />
-                      {t('mapLegendDistant')}
-                    </div>
-                  </div>
-                  <div className="mt-2 text-[10px] text-white/40">{t('mapLegendHint')}</div>
-                </div>
+                ) : null}
                 {mapModel ? (
                   <div className="absolute inset-0 z-10 ui-map-awake">
                     <MapFlow
@@ -916,9 +1029,12 @@ function MapPageInner() {
                       selectedOptionId={selectedOptionId}
                       onSelectOption={setSelectedOptionId}
                       onFocusNode={setFocusedNode}
+                      onNodeHover={() => markHintSeen('hover')}
+                      onNodeClick={() => markHintSeen('click')}
                       focusEnabled={focusEnabled}
                       highlightMode={highlightMode}
                       highlightIds={highlightIds}
+                      legendFocus={legendFocus}
                       ref={mapFlowRef}
                     />
                   </div>

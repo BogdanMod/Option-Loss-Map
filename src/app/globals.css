@@ -47,8 +47,8 @@ body {
 }
 
 .react-flow__edge-path {
-  stroke-width: 1.2px;
-  stroke: rgba(120, 140, 255, 0.25);
+  stroke-width: 1px;
+  stroke: rgba(120, 140, 255, 0.22);
   transition: stroke 160ms var(--ease), stroke-width 160ms var(--ease), opacity 160ms var(--ease);
 }
 
@@ -106,6 +106,22 @@ body {
 }
 
 @media print {
+  .react-flow__controls {
+    display: none !important;
+  }
+
+  .ui-print-page {
+    page-break-after: always;
+  }
+
+  .ui-print-page:last-child {
+    page-break-after: auto;
+  }
+
+  .ui-print-watermark {
+    display: block !important;
+  }
+
   .bg-white {
     background-color: #ffffff !important;
   }
@@ -162,10 +178,10 @@ body {
     transition: all var(--t-base) var(--ease);
   }
 
-  .ui-button:hover {
-    filter: brightness(1.05);
-    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0, 0, 0.25);
-  }
+.ui-button:hover {
+  filter: brightness(1.05);
+  box-shadow: 0 0 0 1px rgba(90, 103, 216, 0.28), 0 12px 28px rgba(0, 0, 0, 0.3);
+}
 
   .ui-button:focus-visible {
     outline: none;
@@ -312,6 +328,50 @@ body {
     backdrop-filter: blur(6px);
   }
 
+.ui-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 8px;
+  padding: 2px 4px;
+  transition: background-color var(--t-base) var(--ease), color var(--t-base) var(--ease);
+}
+
+.ui-legend-item:hover,
+.ui-legend-active {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.ui-map-hints {
+  position: absolute;
+  left: 16px;
+  top: 16px;
+  z-index: 14;
+  display: grid;
+  gap: 4px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(11, 15, 26, 0.68);
+  padding: 8px 10px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.ui-print-watermark {
+  display: none;
+  position: fixed;
+  bottom: 18px;
+  right: 24px;
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(0, 0, 0, 0.22);
+  pointer-events: none;
+}
+
   .ui-legend-dot {
     display: inline-flex;
     height: 8px;
@@ -347,6 +407,7 @@ body {
     background: rgba(255, 255, 255, 0.03);
     backdrop-filter: blur(6px);
     padding: 14px;
+  line-height: 1.55;
   }
 
   .ui-node-current {
