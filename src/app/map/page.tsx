@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MapFlow, type MapFlowHandle } from '@/components/MapFlow';
 import { useSearchParams } from 'next/navigation';
 import { t } from '@/lib/i18n';
@@ -159,7 +159,7 @@ const emptyInput: DecisionInput = {
   constraints: ['']
 };
 
-export default function MapPage() {
+function MapPageInner() {
   const { features } = usePlan();
   const [input, setInput] = useState<DecisionInput>(emptyInput);
   const [mapModel, setMapModel] = useState<MapModel | null>(null);
@@ -932,4 +932,12 @@ export default function MapPage() {
     </main>
   );
 
+}
+
+export default function MapPage() {
+  return (
+    <Suspense fallback={<main className="min-h-screen bg-transparent" />}>
+      <MapPageInner />
+    </Suspense>
+  );
 }

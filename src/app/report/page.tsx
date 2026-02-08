@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import type { DecisionRecord } from '@/lib/history/types';
 import { loadHistory } from '@/lib/history/storage';
@@ -66,7 +66,7 @@ const buildSharePayload = (report: HiddenRuleReport, examples: ExampleRow[]) => 
   examples
 });
 
-export default function ReportPage() {
+function ReportPageInner() {
   const [records, setRecords] = useState<DecisionRecord[]>([]);
   const [shareNotice, setShareNotice] = useState<string | null>(null);
   const [showPaywall, setShowPaywall] = useState(false);
@@ -377,5 +377,13 @@ export default function ReportPage() {
         </div>
       ) : null}
     </main>
+  );
+}
+
+export default function ReportPage() {
+  return (
+    <Suspense fallback={<main className="min-h-screen bg-transparent px-8 py-12" />}>
+      <ReportPageInner />
+    </Suspense>
   );
 }

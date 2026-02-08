@@ -11,7 +11,7 @@ import { buildFutureStatesPrompt } from './prompts';
 
 const model = process.env.NEXT_PUBLIC_OPENAI_MODEL || 'gpt-4o-mini-2024-07-18';
 
-const allowedTags = new Set([
+const allowedTags = new Set<FutureState['tags'][number]>([
   'flexibility_high',
   'flexibility_low',
   'vendor_lockin',
@@ -33,6 +33,9 @@ const allowedTags = new Set([
   'compliance_risk',
   'integration_risk'
 ]);
+
+const isAllowedTag = (tag: string): tag is FutureState['tags'][number] =>
+  allowedTags.has(tag as FutureState['tags'][number]);
 
 const sanitizeToRussian = (value: string) => {
   const hasLatin = /[A-Za-z]/.test(value);
@@ -59,7 +62,7 @@ const sanitizeFutureStates = (items: FutureState[]) => {
       ...item,
       title: title.value,
       subtitle: subtitle.value,
-      tags: item.tags.filter((tag) => allowedTags.has(tag)),
+      tags: item.tags.filter(isAllowedTag),
       evidence
     };
   });
@@ -71,7 +74,7 @@ const fallbackFutureStates = (input: DecisionInput, option: { id: string; label:
   return templates.slice(0, 7).map((template, index) => ({
     title: template.title,
     subtitle: template.subtitle,
-    tags: template.tags.filter((tag) => allowedTags.has(tag)),
+    tags: template.tags.filter(isAllowedTag),
     category: template.tags.some((tag) => tag.includes('org') || tag.includes('hiring'))
       ? 'org'
       : template.tags.some((tag) => tag.includes('fixed_cost') || tag.includes('infra'))
@@ -96,7 +99,7 @@ export async function generateFutureStates(
       model,
       system: 'Ты генерируешь классы будущих состояний. Только структура. Ответ строго на русском.',
       user: prompt,
-      jsonSchema: FutureStateArrayJsonSchema
+      schema: FutureStateArrayJsonSchema
     });
 
     const parsed = FutureStateArraySchema.parse(result);
@@ -107,7 +110,7 @@ export async function generateFutureStates(
         model,
         system: 'Ответь строго на русском без латиницы. Никаких рекомендаций. Только структура.',
         user: prompt,
-        jsonSchema: FutureStateArrayJsonSchema
+        schema: FutureStateArrayJsonSchema
       });
       return FutureStateArraySchema.parse(retry);
     }
