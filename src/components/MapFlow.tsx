@@ -198,7 +198,9 @@ function OptionEdge({ id, sourceX, sourceY, targetX, targetY, data, selected }: 
 
   return (
     <>
-      <BaseEdge id={id} path={edgePath} className={selected ? 'rf-edge-selected' : ''} />
+      <g className={selected ? 'rf-edge-selected' : ''}>
+        <BaseEdge id={id} path={edgePath} />
+      </g>
       <EdgeLabelRenderer>
         <div
           style={{
