@@ -24,10 +24,11 @@ export function summarizeMap(map: MapModel): DecisionRecord['summary'] {
   map.nodes
     .filter((node) => node.type === 'future')
     .forEach((node) => {
-      if (!node.optionId) return;
-      if (!tagsByOption[node.optionId]) tagsByOption[node.optionId] = {};
+      const optionId = node.optionId;
+      if (!optionId) return;
+      if (!tagsByOption[optionId]) tagsByOption[optionId] = {};
       (node.tags ?? []).forEach((tag) => {
-        tagsByOption[node.optionId][tag] = (tagsByOption[node.optionId][tag] ?? 0) + 1;
+        tagsByOption[optionId][tag] = (tagsByOption[optionId][tag] ?? 0) + 1;
       });
     });
 
