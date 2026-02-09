@@ -377,14 +377,15 @@ function MapPageInner() {
     }
   };
 
-  const handleViewExample = async () => {
+  const handleViewExample = async (overrideIndex?: number) => {
     setIsBuilding(true);
     try {
       prevScreenStateRef.current = screenState;
       if (!isDemoView) {
         prevInputRef.current = input;
       }
-      const exampleInput = getExampleDecisionInput(exampleIndex);
+      const nextIndex = typeof overrideIndex === 'number' ? overrideIndex : exampleIndex;
+      const exampleInput = getExampleDecisionInput(nextIndex);
       const response = await fetch('/api/build-map', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -413,6 +414,7 @@ function MapPageInner() {
       setSelectedOptionId(data.map.summary.bestForOptionsPreserved || exampleInput.options[0]?.id || 'A');
       setError(null);
       setInput(exampleInput);
+      setExampleIndex(nextIndex);
       setLlmExtracted(data.extracted ?? null);
       setIsDemoView(true);
       setEditorMode('example');
@@ -898,13 +900,29 @@ function MapPageInner() {
                       <div className="text-[13px] text-white/40">{t('exampleModeTitle')}</div>
                       <div className="mt-1 text-[13px] text-white/50">{t('exampleModeSubtitle')}</div>
                     </div>
-                    <button
-                      type="button"
-                      className="ui-button-secondary"
-                      onClick={() => setEditorMode('mine')}
-                    >
-                      {t('exampleModeCta')}
-                    </button>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        className="ui-button-secondary"
+                        onClick={() =>
+                          setExampleIndex((prev) => (prev - 1 + exampleDecisionInputs.length) % exampleDecisionInputs.length)
+                        }
+                      >
+                        {t('examplePrev')}
+                      </button>
+                      <button
+                        type="button"
+                        className="ui-button-secondary"
+                        onClick={() =>
+                          setExampleIndex((prev) => (prev + 1) % exampleDecisionInputs.length)
+                        }
+                      >
+                        {t('exampleNext')}
+                      </button>
+                      <button type="button" className="ui-button-secondary" onClick={() => setEditorMode('mine')}>
+                        {t('exampleModeCta')}
+                      </button>
+                    </div>
                   </div>
                   <div>
                     <div className="text-[13px] text-white/50">{t('formTitleLabel')}</div>
@@ -1039,9 +1057,20 @@ function MapPageInner() {
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {isDemoView ? (
-                    <button type="button" className="ui-button-primary" onClick={handleExitDemo}>
-                      {t('returnToDecision')}
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        className="ui-button-secondary"
+                        onClick={() =>
+                          handleViewExample((exampleIndex + 1) % exampleDecisionInputs.length)
+                        }
+                      >
+                        {t('exampleOther')}
+                      </button>
+                      <button type="button" className="ui-button-primary" onClick={handleExitDemo}>
+                        {t('returnToDecision')}
+                      </button>
+                    </>
                   ) : (
                     <button
                       type="button"
