@@ -732,7 +732,7 @@ function MapPageInner() {
               <h1 className="mt-4 text-[24px] font-semibold text-white">{t('mapEmptyTitle')}</h1>
               <p className="mt-3 text-[15px] text-white/60">{t('mapEmptySubtitle')}</p>
               <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
-                <button type="button" className="ui-button-primary" onClick={handleViewExample}>
+                <button type="button" className="ui-button-primary" onClick={() => handleViewExample()}>
                   {t('mapEmptyExample')}
                 </button>
                 <button type="button" className="ui-button-secondary" onClick={() => setScreenState('input')}>
