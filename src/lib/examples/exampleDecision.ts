@@ -1,13 +1,40 @@
 import type { DecisionInput } from '@/lib/map/engine';
 
-export const exampleDecisionInput: DecisionInput = {
-  domain: 'hiring',
-  title: 'Нанять первого сотрудника',
-  currentStateText: 'Я всё делаю сам, задач становится больше, времени не хватает.',
-  options: [
-    { id: 'A', label: 'Нанять сейчас', description: '' },
-    { id: 'B', label: 'Подождать', description: '' },
-    { id: 'C', label: 'Использовать фриланс', description: '' }
-  ],
-  constraints: []
-};
+export const exampleDecisionInputs: DecisionInput[] = [
+  {
+    domain: 'hiring',
+    title: 'Нанять первого сотрудника',
+    currentStateText: 'Я всё делаю сам. Задач становится больше, времени не хватает.',
+    options: [
+      { id: 'A', label: 'Нанять сейчас', description: '' },
+      { id: 'B', label: 'Подождать', description: '' },
+      { id: 'C', label: 'Использовать фриланс', description: '' }
+    ],
+    constraints: []
+  },
+  {
+    domain: 'product',
+    title: 'Запускать продукт сейчас или дорабатывать',
+    currentStateText: 'Продукт работает, но не идеален. Есть первые пользователи.',
+    options: [
+      { id: 'A', label: 'Запуск сейчас', description: '' },
+      { id: 'B', label: 'Доработать ещё', description: '' },
+      { id: 'C', label: 'Закрытая бета', description: '' }
+    ],
+    constraints: []
+  },
+  {
+    domain: 'hiring',
+    title: 'Уволиться или остаться на текущей работе',
+    currentStateText: 'Работа стабильная, но нет роста и энергии.',
+    options: [
+      { id: 'A', label: 'Уволиться сейчас', description: '' },
+      { id: 'B', label: 'Остаться', description: '' },
+      { id: 'C', label: 'Искать параллельно', description: '' }
+    ],
+    constraints: []
+  }
+];
+
+export const getExampleDecisionInput = (index: number) =>
+  exampleDecisionInputs[index % exampleDecisionInputs.length] ?? exampleDecisionInputs[0];

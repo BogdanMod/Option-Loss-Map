@@ -7,7 +7,7 @@ import { useSearchParams } from 'next/navigation';
 import { t } from '@/lib/i18n';
 import { MapModelSchema } from '@/lib/map/schema';
 import type { DecisionInput } from '@/lib/map/engine';
-import { exampleDecisionInput } from '@/lib/examples/exampleDecision';
+import { exampleDecisionInputs, getExampleDecisionInput } from '@/lib/examples/exampleDecision';
 import type { MapEdge, MapModel, MapNode } from '@/lib/map/types';
 import type { DecisionRecord } from '@/lib/history/types';
 import { summarizeMap } from '@/lib/history/summarize';
@@ -181,6 +181,7 @@ function MapPageInner() {
   const [isDemoView, setIsDemoView] = useState(false);
   const [activeOptionIndex, setActiveOptionIndex] = useState<number | null>(null);
   const [editorMode, setEditorMode] = useState<'mine' | 'example'>('mine');
+  const [exampleIndex, setExampleIndex] = useState(0);
   const prevInputRef = useRef<DecisionInput | null>(null);
   const prevScreenStateRef = useRef<'empty' | 'input' | 'analysis'>('empty');
   const [highlightMode, setHighlightMode] = useState<'none' | 'closedFuture' | 'reason' | 'metric'>('none');
@@ -383,10 +384,11 @@ function MapPageInner() {
       if (!isDemoView) {
         prevInputRef.current = input;
       }
+      const exampleInput = getExampleDecisionInput(exampleIndex);
       const response = await fetch('/api/build-map', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(exampleDecisionInput)
+        body: JSON.stringify(exampleInput)
       });
 
       if (!response.ok) {
@@ -396,7 +398,10 @@ function MapPageInner() {
 
       const data = (await response.json()) as { map: MapModel; extracted?: unknown };
       MapModelSchema.parse(data.map);
-      const demoEdges = data.map.edges.filter((edge) => edge.optionId === (data.map.summary.bestForOptionsPreserved || exampleDecisionInput.options[0]?.id || 'A'));
+      const demoEdges = data.map.edges.filter(
+        (edge) =>
+          edge.optionId === (data.map.summary.bestForOptionsPreserved || exampleInput.options[0]?.id || 'A')
+      );
       const demoNodeIds = new Set<string>();
       demoEdges.forEach((edge) => {
         demoNodeIds.add(edge.source);
@@ -405,9 +410,9 @@ function MapPageInner() {
       setMapModel(data.map);
       setMapVersion((prev) => prev + 1);
       setFocusedNode(null);
-      setSelectedOptionId(data.map.summary.bestForOptionsPreserved || exampleDecisionInput.options[0]?.id || 'A');
+      setSelectedOptionId(data.map.summary.bestForOptionsPreserved || exampleInput.options[0]?.id || 'A');
       setError(null);
-      setInput(exampleDecisionInput);
+      setInput(exampleInput);
       setLlmExtracted(data.extracted ?? null);
       setIsDemoView(true);
       setEditorMode('example');
@@ -887,38 +892,52 @@ function MapPageInner() {
               </div>
 
               <div className={`absolute inset-0 ui-crossfade ${editorMode === 'example' ? '' : 'ui-crossfade-hidden'}`}>
-                <div className="grid gap-6">
-                  <div className="text-[13px] text-white/40">{t('exampleModeLabel')}</div>
+                <div key={`example-${exampleIndex}`} className="grid gap-6 ui-crossfade">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <div className="text-[13px] text-white/40">{t('exampleModeTitle')}</div>
+                      <div className="mt-1 text-[13px] text-white/50">{t('exampleModeSubtitle')}</div>
+                    </div>
+                    <button
+                      type="button"
+                      className="ui-button-secondary"
+                      onClick={() => setEditorMode('mine')}
+                    >
+                      {t('exampleModeCta')}
+                    </button>
+                  </div>
                   <div>
                     <div className="text-[13px] text-white/50">{t('formTitleLabel')}</div>
-                    <div className="mt-2 text-[18px] text-white">{exampleDecisionInput.title}</div>
+                    <div className="mt-2 text-[18px] text-white">{getExampleDecisionInput(exampleIndex).title}</div>
                   </div>
                   <div>
                     <div className="text-[13px] text-white/50">{t('formDomain')}</div>
                     <div className="mt-2 text-[15px] text-white/70">
-                      {exampleDecisionInput.domain === 'product'
+                      {getExampleDecisionInput(exampleIndex).domain === 'product'
                         ? t('domainProduct')
-                        : exampleDecisionInput.domain === 'architecture'
+                        : getExampleDecisionInput(exampleIndex).domain === 'architecture'
                           ? t('domainArchitecture')
-                          : exampleDecisionInput.domain === 'data'
+                          : getExampleDecisionInput(exampleIndex).domain === 'data'
                             ? t('domainData')
-                            : exampleDecisionInput.domain === 'hiring'
+                            : getExampleDecisionInput(exampleIndex).domain === 'hiring'
                               ? t('domainHiring')
-                              : exampleDecisionInput.domain === 'pricing'
+                              : getExampleDecisionInput(exampleIndex).domain === 'pricing'
                                 ? t('domainPricing')
-                                : exampleDecisionInput.domain === 'market'
+                                : getExampleDecisionInput(exampleIndex).domain === 'market'
                                   ? t('domainMarket')
                                   : t('domainCustom')}
                     </div>
                   </div>
                   <div>
                     <div className="text-[13px] text-white/50">{t('formCurrentState')}</div>
-                    <div className="mt-2 text-[15px] text-white/70">{exampleDecisionInput.currentStateText}</div>
+                    <div className="mt-2 text-[15px] text-white/70">
+                      {getExampleDecisionInput(exampleIndex).currentStateText}
+                    </div>
                   </div>
                   <div className="grid gap-2">
                     <div className="text-[13px] text-white/50">{t('formOptions')}</div>
                     <div className="grid gap-2">
-                      {exampleDecisionInput.options.map((option) => (
+                      {getExampleDecisionInput(exampleIndex).options.map((option) => (
                         <div key={option.id} className="ui-card ui-option-card-soft px-4 py-3">
                           <div className="text-[11px] uppercase tracking-wide text-white/40">{t('optionPathLabel')}</div>
                           <div className="mt-2 text-[15px] text-white">{option.label}</div>
@@ -926,6 +945,17 @@ function MapPageInner() {
                             <div className="mt-1 text-[13px] text-white/60">{option.description}</div>
                           ) : null}
                         </div>
+                      ))}
+                    </div>
+                    <div className="mt-2 flex items-center gap-2 text-[12px] text-white/40">
+                      {exampleDecisionInputs.map((_, index) => (
+                        <button
+                          key={`example-dot-${index}`}
+                          type="button"
+                          aria-label={`Пример ${index + 1}`}
+                          className={`h-2.5 w-2.5 rounded-full border border-white/20 ${exampleIndex === index ? 'bg-white/60' : 'bg-white/10'}`}
+                          onClick={() => setExampleIndex(index)}
+                        />
                       ))}
                     </div>
                   </div>
