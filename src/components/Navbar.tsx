@@ -200,7 +200,7 @@ export default function Navbar() {
 
               <div className="mt-4 ui-card px-3 py-3">
                 <div className="text-[13px] font-semibold text-white/50">Промокод</div>
-                <div className="mt-2 flex items-center gap-2">
+                <div className="mt-2 ui-promo-row">
                   <input
                     value={promoCode}
                     onChange={(event) => setPromoCode(event.target.value)}

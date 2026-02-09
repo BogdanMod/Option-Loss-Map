@@ -20,10 +20,10 @@
   --font-h1: 26px;
   --font-h2: 18px;
   --text-primary: rgba(255, 255, 255, 0.98);
-  --text-secondary: rgba(255, 255, 255, 0.65);
-  --border-subtle: rgba(255, 255, 255, 0.12);
-  --surface: rgba(17, 22, 42, 0.6);
-  --surface-hover: rgba(255, 255, 255, 0.08);
+  --text-secondary: rgba(255, 255, 255, 0.7);
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --surface: rgba(12, 16, 28, 0.92);
+  --surface-hover: rgba(255, 255, 255, 0.1);
   --accent: #5a67d8;
 }
 
@@ -138,6 +138,7 @@ body {
   .ui-surface {
     background-color: var(--surface);
     border-radius: var(--radius-md);
+  backdrop-filter: blur(10px);
   }
 
   .ui-surface-hover:hover {
@@ -323,9 +324,9 @@ body {
     z-index: 15;
     border-radius: 10px;
     border: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(11, 15, 26, 0.72);
+  background: rgba(12, 16, 28, 0.92);
     padding: 10px 12px;
-    backdrop-filter: blur(6px);
+  backdrop-filter: blur(10px);
   }
 
 .ui-legend-item {
@@ -341,6 +342,19 @@ body {
 .ui-legend-active {
   background: rgba(255, 255, 255, 0.06);
   color: rgba(255, 255, 255, 0.9);
+}
+
+.ui-promo-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.ui-promo-row button {
+  height: 36px;
+  flex-shrink: 0;
 }
 
 .ui-map-hints {
@@ -404,8 +418,8 @@ body {
   .ui-node {
     border-radius: 12px;
     border: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(255, 255, 255, 0.03);
-    backdrop-filter: blur(6px);
+  background: rgba(12, 16, 28, 0.92);
+  backdrop-filter: blur(10px);
     padding: 14px;
   line-height: 1.55;
   }
@@ -460,11 +474,32 @@ body {
 @layer components {
   .ui-card {
     @apply ui-surface ui-border ui-panel;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
   }
 
   .ui-section {
     @apply ui-surface ui-border ui-panel;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
   }
+
+.ui-section .text-white\/40,
+.ui-card .text-white\/40 {
+  color: rgba(255, 255, 255, 0.7) !important;
+}
+
+.ui-section .text-white\/50,
+.ui-card .text-white\/50 {
+  color: rgba(255, 255, 255, 0.72) !important;
+}
+
+.ui-section .text-white\/60,
+.ui-card .text-white\/60 {
+  color: rgba(255, 255, 255, 0.78) !important;
+}
 
   .ui-label {
     @apply text-[13px] text-white/50;
