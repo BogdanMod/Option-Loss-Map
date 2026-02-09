@@ -15,6 +15,8 @@ import { addRecord, loadHistory, updateRecord } from '@/lib/history/storage';
 import { usePlan } from '@/lib/billing/usePlan';
 import { encodeSharePayload } from '@/lib/share/encode';
 import type { MapSharePayload } from '@/lib/share/mapPayload';
+import { getAnonUserId } from '@/lib/analytics/anon';
+import { trackEvent } from '@/lib/analytics/track';
 
 const getConfidenceColor = (level: MapEdge['metrics']['confidence']) => {
   switch (level) {
@@ -163,7 +165,7 @@ const emptyInput: DecisionInput = {
 };
 
 function MapPageInner() {
-  const { features } = usePlan();
+  const { features, plan } = usePlan();
   const [input, setInput] = useState<DecisionInput>(emptyInput);
   const [mapModel, setMapModel] = useState<MapModel | null>(null);
   const [mapVersion, setMapVersion] = useState(0);
@@ -205,6 +207,7 @@ function MapPageInner() {
   const [shareNotice, setShareNotice] = useState<string | null>(null);
   const [hintState, setHintState] = useState({ hover: false, click: false, panel: false });
   const [hintsReady, setHintsReady] = useState(false);
+  const lastAnalysisRef = useRef<number | null>(null);
 
   const selectedOption = useMemo(
     () =>
@@ -353,6 +356,7 @@ function MapPageInner() {
       clearHighlight(true);
       setShowAllClosed(false);
       setScreenState('analysis');
+      trackEvent('map_built', { page: '/map', plan, source: 'user' });
       if (data.llmUsed === false) {
         setError({ title: t('llmFallbackTitle'), message: t('llmFallbackNotice') });
       }
@@ -392,6 +396,12 @@ function MapPageInner() {
 
       const data = (await response.json()) as { map: MapModel; extracted?: unknown };
       MapModelSchema.parse(data.map);
+      const demoEdges = data.map.edges.filter((edge) => edge.optionId === (data.map.summary.bestForOptionsPreserved || exampleDecisionInput.options[0]?.id || 'A'));
+      const demoNodeIds = new Set<string>();
+      demoEdges.forEach((edge) => {
+        demoNodeIds.add(edge.source);
+        demoNodeIds.add(edge.target);
+      });
       setMapModel(data.map);
       setMapVersion((prev) => prev + 1);
       setFocusedNode(null);
@@ -401,7 +411,10 @@ function MapPageInner() {
       setLlmExtracted(data.extracted ?? null);
       setIsDemoView(true);
       setEditorMode('example');
+      setHighlightMode('reason');
+      setHighlightIds({ nodeIds: Array.from(demoNodeIds), edgeIds: demoEdges.map((edge) => edge.id) });
       setScreenState('analysis');
+      trackEvent('demo_viewed', { page: '/map', plan, source: 'demo' });
       requestAnimationFrame(() => {
         mapFlowRef.current?.fit();
         graphRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -434,12 +447,14 @@ function MapPageInner() {
     const inputKey = stableStringify(input);
     const existing = historyItems.find((item) => stableStringify(item.input) === inputKey);
     const summary = summarizeMap(mapModel);
+    const anonUserId = getAnonUserId();
     const now = Date.now();
     if (existing) {
       const shouldUpdate = window.confirm(t('historyUpdateConfirm'));
       if (!shouldUpdate) return;
       const updatedRecord: DecisionRecord = {
         ...existing,
+        anonUserId: existing.anonUserId ?? anonUserId ?? undefined,
         createdAt: now,
         title: input.title,
         domain: input.domain,
@@ -449,12 +464,14 @@ function MapPageInner() {
       };
       const updated = updateRecord(existing.id, updatedRecord);
       setHistoryItems(updated);
+      trackEvent('map_saved', { page: '/map', plan, source: isDemoView ? 'demo' : 'user' });
       return;
     }
 
     const id = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${now}-${Math.random()}`;
     const record: DecisionRecord = {
       id,
+      anonUserId: anonUserId ?? undefined,
       createdAt: now,
       title: input.title,
       domain: input.domain,
@@ -464,6 +481,7 @@ function MapPageInner() {
     };
     const next = addRecord(record);
     setHistoryItems(next);
+    trackEvent('map_saved', { page: '/map', plan, source: isDemoView ? 'demo' : 'user' });
   };
 
   const clearHighlight = useCallback((force = false) => {
@@ -626,6 +644,13 @@ function MapPageInner() {
     });
   }, [clearHighlight, searchParams]);
 
+  useEffect(() => {
+    if (!mapModel || screenState !== 'analysis') return;
+    if (lastAnalysisRef.current === mapVersion) return;
+    lastAnalysisRef.current = mapVersion;
+    trackEvent('analysis_viewed', { page: '/map', plan, source: isDemoView ? 'demo' : 'user' });
+  }, [isDemoView, mapModel, mapVersion, plan, screenState]);
+
   const persistHintState = useCallback((next: { hover: boolean; click: boolean; panel: boolean }) => {
     setHintState(next);
     try {
@@ -672,6 +697,7 @@ function MapPageInner() {
     const token = encodeSharePayload(payload);
     const url = `${window.location.origin}/export/${token}?print=1`;
     window.open(url, '_blank', 'noopener,noreferrer');
+    trackEvent('export_pdf', { page: '/map', plan, source: isDemoView ? 'demo' : 'user' });
     window.setTimeout(() => setExportStatus('done'), 800);
     window.setTimeout(() => setExportStatus('idle'), 2600);
   };
@@ -685,6 +711,7 @@ function MapPageInner() {
     window.open(url, '_blank', 'noopener,noreferrer');
     navigator.clipboard?.writeText(url).catch(() => undefined);
     setShareNotice(t('shareMapCopied'));
+    trackEvent('share_link_created', { page: '/map', plan, source: isDemoView ? 'demo' : 'user' });
     window.setTimeout(() => setShareNotice(null), 2200);
   };
 

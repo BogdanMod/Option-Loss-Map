@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google';
 import './globals.css';
 import { ThemeProvider } from '@/lib/theme/ThemeProvider';
 import Navbar from '@/components/Navbar';
+import AnalyticsClient from '@/components/AnalyticsClient';
 
 const inter = Inter({ subsets: ['latin', 'cyrillic'] });
 
@@ -16,6 +17,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="ru" suppressHydrationWarning>
       <body className={`${inter.className} min-h-screen bg-ink-950 text-white transition-colors duration-200`}>
         <ThemeProvider>
+          <AnalyticsClient />
           <Navbar />
           {children}
         </ThemeProvider>

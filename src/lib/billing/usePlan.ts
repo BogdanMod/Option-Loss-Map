@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { PLAN_FEATURES, PLAN_LABELS, type Plan } from './plan';
+import { getAnonUserId } from '@/lib/analytics/anon';
 
 const STORAGE_KEY = 'olm_plan';
 
@@ -19,6 +20,23 @@ export const usePlan = () => {
 
   useEffect(() => {
     setPlanState(readStoredPlan());
+  }, []);
+
+  useEffect(() => {
+    const anonUserId = getAnonUserId();
+    if (!anonUserId) return;
+    fetch(`/api/plan?anon_user_id=${encodeURIComponent(anonUserId)}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { plan?: Plan } | null) => {
+        if (!data?.plan) return;
+        setPlanState(data.plan);
+        try {
+          window.localStorage.setItem(STORAGE_KEY, data.plan);
+        } catch {
+          // ignore
+        }
+      })
+      .catch(() => undefined);
   }, []);
 
   const setPlan = (nextPlan: Plan) => {

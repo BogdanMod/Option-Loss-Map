@@ -11,6 +11,7 @@ import type { HiddenRuleReport } from '@/lib/rules/types';
 import { encodeSharePayload } from '@/lib/share/encode';
 import { t } from '@/lib/i18n';
 import { usePlan } from '@/lib/billing/usePlan';
+import { trackEvent } from '@/lib/analytics/track';
 
 type ExampleRow = {
   recordId: string;
@@ -71,7 +72,7 @@ function ReportPageInner() {
   const [shareNotice, setShareNotice] = useState<string | null>(null);
   const [showPaywall, setShowPaywall] = useState(false);
   const [paywallContext, setPaywallContext] = useState<'pdf' | 'share'>('share');
-  const { features } = usePlan();
+  const { features, plan } = usePlan();
   const params = useSearchParams();
   const isPrint = params?.get('print') === '1';
 
@@ -106,6 +107,7 @@ function ReportPageInner() {
     window.open(url, '_blank');
     navigator.clipboard?.writeText(url).catch(() => undefined);
     setShareNotice(t('shareCopied'));
+    trackEvent('share_link_created', { page: '/report', plan, source: 'report' });
     setTimeout(() => setShareNotice(null), 2000);
   };
 
@@ -141,6 +143,7 @@ function ReportPageInner() {
                       return;
                     }
                     window.open('/report?print=1', '_blank');
+                    trackEvent('export_pdf', { page: '/report', plan, source: 'report' });
                   }}
                 >
                   {t('reportDownload')}

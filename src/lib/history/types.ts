@@ -3,6 +3,7 @@ import type { MapModel } from '@/lib/map/types';
 
 export type DecisionRecord = {
   id: string;
+  anonUserId?: string;
   createdAt: number;
   title: string;
   domain: string;

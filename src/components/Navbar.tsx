@@ -7,6 +7,7 @@ import { t } from '@/lib/i18n';
 import { usePlan } from '@/lib/billing/usePlan';
 import { PLAN_LABELS } from '@/lib/billing/plan';
 import { loadHistory } from '@/lib/history/storage';
+import { getAnonUserId } from '@/lib/analytics/anon';
 
 const navItems = [
   { href: '/map', label: 'navMap' },
@@ -21,6 +22,9 @@ export default function Navbar() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [planNotice, setPlanNotice] = useState<string | null>(null);
   const [historyCount, setHistoryCount] = useState(0);
+  const [promoCode, setPromoCode] = useState('');
+  const [promoNotice, setPromoNotice] = useState<string | null>(null);
+  const [promoLoading, setPromoLoading] = useState(false);
   const popoverRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -37,6 +41,12 @@ export default function Navbar() {
     const timer = window.setTimeout(() => setPlanNotice(null), 2000);
     return () => window.clearTimeout(timer);
   }, [planNotice]);
+
+  useEffect(() => {
+    if (!promoNotice) return;
+    const timer = window.setTimeout(() => setPromoNotice(null), 2200);
+    return () => window.clearTimeout(timer);
+  }, [promoNotice]);
 
   useEffect(() => {
     if (!profileOpen) return;
@@ -64,6 +74,29 @@ export default function Navbar() {
   ];
 
   const unavailableItems = [
+  const handlePromoApply = async () => {
+    if (!promoCode.trim() || promoLoading) return;
+    const anonUserId = getAnonUserId();
+    if (!anonUserId) return;
+    setPromoLoading(true);
+    const res = await fetch('/api/promo/validate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        code: promoCode.trim(),
+        anon_user_id: anonUserId,
+        context: { page: pathname ?? '/map', plan, source: 'promo' }
+      })
+    });
+    if (res.ok) {
+      setPlan('pro');
+      setPromoNotice('Промокод активирован.');
+      setPromoCode('');
+    } else {
+      setPromoNotice('Промокод недействителен.');
+    }
+    setPromoLoading(false);
+  };
     ...(features.allowCompare ? [] : [t('upgradeItemCompare')]),
     ...(features.allowHiddenRules ? [] : [t('upgradeItemRules')]),
     ...(features.allowPdf ? [] : [t('upgradeItemPdf')]),
@@ -162,6 +195,22 @@ export default function Navbar() {
                     {t('paywallUpgrade')}
                   </Link>
                 ) : null}
+              </div>
+
+              <div className="mt-4 ui-card px-3 py-3">
+                <div className="text-[13px] font-semibold text-white/50">Промокод</div>
+                <div className="mt-2 flex items-center gap-2">
+                  <input
+                    value={promoCode}
+                    onChange={(event) => setPromoCode(event.target.value)}
+                    placeholder="Введите код"
+                    className="h-9 flex-1 rounded-[10px] border border-white/10 bg-white/5 px-3 text-[13px] text-white"
+                  />
+                  <button type="button" className="ui-button-secondary" onClick={handlePromoApply}>
+                    {promoLoading ? '...' : 'Активировать'}
+                  </button>
+                </div>
+                {promoNotice ? <div className="mt-2 text-[12px] text-white/50">{promoNotice}</div> : null}
               </div>
 
               {process.env.NODE_ENV !== 'production' ? (
