@@ -74,6 +74,12 @@ export default function Navbar() {
   ];
 
   const unavailableItems = [
+    ...(features.allowCompare ? [] : [t('upgradeItemCompare')]),
+    ...(features.allowHiddenRules ? [] : [t('upgradeItemRules')]),
+    ...(features.allowPdf ? [] : [t('upgradeItemPdf')]),
+    ...(features.allowShare ? [] : [t('upgradeItemShare')])
+  ];
+
   const handlePromoApply = async () => {
     if (!promoCode.trim() || promoLoading) return;
     const anonUserId = getAnonUserId();
@@ -97,11 +103,6 @@ export default function Navbar() {
     }
     setPromoLoading(false);
   };
-    ...(features.allowCompare ? [] : [t('upgradeItemCompare')]),
-    ...(features.allowHiddenRules ? [] : [t('upgradeItemRules')]),
-    ...(features.allowPdf ? [] : [t('upgradeItemPdf')]),
-    ...(features.allowShare ? [] : [t('upgradeItemShare')])
-  ];
 
   return (
     <nav className="sticky top-0 z-40 border-b border-white/10 bg-ink-950/70 backdrop-blur print:hidden">
