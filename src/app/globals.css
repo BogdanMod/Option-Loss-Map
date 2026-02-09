@@ -35,6 +35,7 @@ body {
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   --t-fast: 120ms;
   --t-base: 180ms;
+  --t-med: 180ms;
   --t-slow: 260ms;
 }
 
@@ -84,7 +85,9 @@ body {
   }
 
   button {
-    transition: background-color 180ms ease, color 180ms ease, border-color 180ms ease, opacity 180ms ease;
+    transition: background-color var(--t-med) var(--ease), color var(--t-med) var(--ease),
+      border-color var(--t-med) var(--ease), box-shadow var(--t-med) var(--ease),
+      transform var(--t-med) var(--ease), opacity var(--t-med) var(--ease);
   }
 
   input,
@@ -94,14 +97,16 @@ body {
     border-color: rgba(255, 255, 255, 0.18);
     padding: 10px 12px;
     font-size: 15px;
+    transition: background-color var(--t-med) var(--ease), border-color var(--t-med) var(--ease),
+      box-shadow var(--t-med) var(--ease), transform var(--t-med) var(--ease), opacity var(--t-med) var(--ease);
   }
 
   input:focus,
   select:focus,
   textarea:focus {
     outline: none;
-    border-color: #5a67d8;
-    box-shadow: none;
+    border-color: rgba(120, 140, 255, 0.6);
+    box-shadow: 0 0 0 1px rgba(120, 140, 255, 0.45), 0 0 0 6px rgba(120, 140, 255, 0.12);
   }
 }
 
@@ -139,6 +144,7 @@ body {
     background-color: var(--surface);
     border-radius: var(--radius-md);
   backdrop-filter: blur(10px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
   }
 
   .ui-surface-hover:hover {
@@ -151,11 +157,13 @@ body {
 
   .ui-focus:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 1px rgba(120, 140, 255, 0.35), 0 8px 24px rgba(0, 0, 0, 0.28);
+    box-shadow: 0 0 0 1px rgba(120, 140, 255, 0.45), 0 0 0 6px rgba(120, 140, 255, 0.12);
   }
 
   .ui-transition {
-    transition: all var(--t-base) var(--ease);
+    transition: background-color var(--t-med) var(--ease), border-color var(--t-med) var(--ease),
+      box-shadow var(--t-med) var(--ease), transform var(--t-med) var(--ease),
+      opacity var(--t-med) var(--ease);
   }
 
   .ui-focus-glow {
@@ -172,21 +180,25 @@ body {
   }
 
   .ui-press:active {
-    transform: scale(0.98);
+    transform: translateY(0) scale(0.98);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
   }
 
   .ui-button {
-    transition: all var(--t-base) var(--ease);
+    transition: background-color var(--t-med) var(--ease), border-color var(--t-med) var(--ease),
+      box-shadow var(--t-med) var(--ease), transform var(--t-med) var(--ease),
+      opacity var(--t-med) var(--ease);
   }
 
 .ui-button:hover {
-  filter: brightness(1.05);
-  box-shadow: 0 0 0 1px rgba(90, 103, 216, 0.28), 0 12px 28px rgba(0, 0, 0, 0.3);
+    filter: brightness(1.05);
+    transform: translateY(-1px);
+    box-shadow: 0 0 0 1px rgba(90, 103, 216, 0.3), 0 12px 28px rgba(0, 0, 0, 0.3);
 }
 
   .ui-button:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 1px rgba(120, 140, 255, 0.35), 0 8px 24px rgba(0, 0, 0, 0.28);
+    box-shadow: 0 0 0 1px rgba(120, 140, 255, 0.45), 0 0 0 6px rgba(120, 140, 255, 0.12);
   }
 
   .ui-button:disabled {
@@ -195,8 +207,9 @@ body {
   }
 
   .ui-input {
-    transition: box-shadow var(--t-base) ease-out, border-color var(--t-base) ease-out,
-      background-color var(--t-base) ease-out, color var(--t-base) ease-out;
+    transition: box-shadow var(--t-med) var(--ease), border-color var(--t-med) var(--ease),
+      background-color var(--t-med) var(--ease), color var(--t-med) var(--ease),
+      transform var(--t-med) var(--ease), opacity var(--t-med) var(--ease);
   }
 
   .ui-input::placeholder {
@@ -205,13 +218,14 @@ body {
   }
 
   .ui-input:focus {
-    box-shadow: 0 0 0 1px rgba(120, 140, 255, 0.28), 0 10px 26px rgba(0, 0, 0, 0.32);
-    background-color: rgba(255, 255, 255, 0.06);
+    box-shadow: 0 0 0 1px rgba(120, 140, 255, 0.45), 0 0 0 6px rgba(120, 140, 255, 0.12);
+    background-color: rgba(255, 255, 255, 0.08);
   }
 
   .ui-panel {
-    transition: border-color var(--t-base) var(--ease), box-shadow var(--t-base) var(--ease),
-      background-color var(--t-base) var(--ease), transform var(--t-base) var(--ease);
+    transition: border-color var(--t-med) var(--ease), box-shadow var(--t-med) var(--ease),
+      background-color var(--t-med) var(--ease), transform var(--t-med) var(--ease),
+      opacity var(--t-med) var(--ease);
   }
 
   .ui-panel:hover {
@@ -223,7 +237,7 @@ body {
     opacity: 0;
     transform: translateY(6px);
     pointer-events: none;
-    transition: opacity var(--t-base) ease-out, transform var(--t-base) ease-out;
+    transition: opacity var(--t-med) var(--ease), transform var(--t-med) var(--ease);
   }
 
   .ui-disclose-open {
@@ -233,8 +247,8 @@ body {
   }
 
   .ui-option-card {
-    transition: transform var(--t-base) ease-out, box-shadow var(--t-base) ease-out,
-      background-color var(--t-base) ease-out;
+    transition: transform var(--t-med) var(--ease), box-shadow var(--t-med) var(--ease),
+      background-color var(--t-med) var(--ease), border-color var(--t-med) var(--ease);
   }
 
   .ui-option-card:hover {
@@ -260,13 +274,13 @@ body {
   }
 
   .ui-fade-in {
-    transition: opacity var(--t-base) ease-out, transform var(--t-base) ease-out;
+    transition: opacity var(--t-med) var(--ease), transform var(--t-med) var(--ease);
   }
 
   .ui-crossfade {
     opacity: 1;
     transform: translateY(0);
-    transition: opacity var(--t-base) ease-out, transform var(--t-base) ease-out;
+    transition: opacity var(--t-med) var(--ease), transform var(--t-med) var(--ease);
   }
 
   .ui-crossfade-hidden {
@@ -308,7 +322,7 @@ body {
     background: radial-gradient(60% 40% at 50% 0%, rgba(90, 103, 216, 0.18), transparent 70%);
     opacity: 0;
     transform: translateY(6px);
-    transition: opacity var(--t-base) ease-out, transform var(--t-base) ease-out;
+    transition: opacity var(--t-med) var(--ease), transform var(--t-med) var(--ease);
     pointer-events: none;
   }
 
