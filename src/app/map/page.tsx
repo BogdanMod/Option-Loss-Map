@@ -175,6 +175,7 @@ function MapPageInner() {
   const [isBuilding, setIsBuilding] = useState(false);
   const [focusEnabled, setFocusEnabled] = useState(true);
   const mapFlowRef = useRef<MapFlowHandle | null>(null);
+  const mobileMapRef = useRef<MapFlowHandle | null>(null);
   const [showAllClosed, setShowAllClosed] = useState(false);
   const [historyItems, setHistoryItems] = useState<DecisionRecord[]>([]);
   const [screenState, setScreenState] = useState<'empty' | 'input' | 'analysis'>('empty');
@@ -208,6 +209,10 @@ function MapPageInner() {
   const [shareNotice, setShareNotice] = useState<string | null>(null);
   const [hintState, setHintState] = useState({ hover: false, click: false, panel: false });
   const [hintsReady, setHintsReady] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileMapOpen, setMobileMapOpen] = useState(false);
+  const [mobileLegendOpen, setMobileLegendOpen] = useState(false);
+  const [mobileInfoOpen, setMobileInfoOpen] = useState(false);
   const lastAnalysisRef = useRef<number | null>(null);
 
   const selectedOption = useMemo(
@@ -630,6 +635,24 @@ function MapPageInner() {
   }, []);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const media = window.matchMedia('(max-width: 768px)');
+    const update = () => setIsMobile(media.matches);
+    update();
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    if (mobileMapOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+  }, [mobileMapOpen]);
+
+  useEffect(() => {
     const recordId = searchParams?.get('open');
     if (!recordId) return;
     const items = loadHistory();
@@ -720,6 +743,29 @@ function MapPageInner() {
     setShareNotice(t('shareMapCopied'));
     trackEvent('share_link_created', { page: '/map', plan, source: isDemoView ? 'demo' : 'user' });
     window.setTimeout(() => setShareNotice(null), 2200);
+  };
+
+  const openMobileMap = () => {
+    setMobileMapOpen(true);
+    setMobileLegendOpen(false);
+    setMobileInfoOpen(false);
+    requestAnimationFrame(() => mobileMapRef.current?.fit());
+  };
+
+  const closeMobileMap = () => {
+    setMobileMapOpen(false);
+    setMobileLegendOpen(false);
+    setMobileInfoOpen(false);
+  };
+
+  const handleReasonTap = (tags: string[], id: string) => {
+    const ids = setHighlightFromReason(tags, id, true);
+    if (ids) scheduleHighlightFocus(ids.nodeIds);
+  };
+
+  const handleClosedTap = (item: MapEdge['closedFutures'][number], id: string) => {
+    const ids = setHighlightFromClosedFuture(item, id, true);
+    if (ids) scheduleHighlightFocus(ids.nodeIds);
   };
 
   return (
@@ -982,7 +1028,7 @@ function MapPageInner() {
             </div>
           </section>
         ) : (
-          <div className="grid min-h-[calc(100vh-3rem)] w-full grid-cols-[360px_minmax(0,1fr)] gap-8 ui-crossfade">
+          <div className="grid min-h-[calc(100vh-3rem)] w-full grid-cols-1 gap-6 ui-crossfade lg:grid-cols-[360px_minmax(0,1fr)] lg:gap-8">
             <aside className="flex flex-col gap-4" onMouseEnter={() => markHintSeen('panel')}>
               <div className="ui-section px-5 py-5 backdrop-blur">
                 <div className="ui-caption uppercase tracking-wide">{t('mapTitle')}</div>
@@ -991,6 +1037,11 @@ function MapPageInner() {
                 {isDemoView ? <div className="mt-3 text-[12px] text-white/50">{t('demoLabel')}</div> : null}
                 {hintsReady && !hintState.panel ? (
                   <div className="mt-3 text-[12px] text-white/50">{t('hintPanel')}</div>
+                ) : null}
+                {isMobile ? (
+                  <button type="button" className="mt-4 ui-button-primary" onClick={openMobileMap}>
+                    {t('mobileOpenMap')}
+                  </button>
                 ) : null}
               </div>
 
@@ -1096,7 +1147,7 @@ function MapPageInner() {
               </div>
             </aside>
 
-            <section className="flex flex-col gap-3" ref={graphRef}>
+            <section className={`flex flex-col gap-3 ${isMobile ? 'hidden' : 'lg:flex'}`} ref={graphRef}>
               <div className="min-h-[calc(100vh-8rem)] flex-1 ui-section backdrop-blur ui-map-shell ui-crossfade">
                 <div className="ui-map-grid pointer-events-none z-0" />
                 <div className="ui-map-shimmer pointer-events-none z-0 ui-map-shimmer-active" />
@@ -1131,6 +1182,162 @@ function MapPageInner() {
           </div>
         )}
       </div>
+      {isMobile && mobileMapOpen ? (
+        <div className="fixed inset-0 z-50 bg-ink-950">
+          <div className="absolute inset-0">
+            <div className="ui-map-grid pointer-events-none z-0" />
+            {mapModel ? (
+              <div className="absolute inset-0 z-10 ui-map-awake">
+                <MapFlow
+                  key={`mobile-${mapVersion}`}
+                  model={mapModel}
+                  selectedOptionId={selectedOptionId}
+                  onSelectOption={setSelectedOptionId}
+                  onFocusNode={setFocusedNode}
+                  onNodeHover={undefined}
+                  onNodeClick={() => markHintSeen('click')}
+                  focusEnabled={focusEnabled}
+                  highlightMode={highlightMode}
+                  highlightIds={highlightIds}
+                  legendFocus={legendFocus}
+                  ref={mobileMapRef}
+                />
+              </div>
+            ) : null}
+          </div>
+          <div className="ui-mobile-topbar">
+            <button type="button" className="ui-button-secondary" onClick={closeMobileMap}>
+              {t('mobileBack')}
+            </button>
+            <div className="flex items-center gap-2">
+              <button type="button" className="ui-button-secondary" onClick={() => mobileMapRef.current?.fit()}>
+                {t('fitView')}
+              </button>
+              <button type="button" className="ui-button-secondary" onClick={() => mobileMapRef.current?.centerOnCurrent()}>
+                {t('centerView')}
+              </button>
+              <button type="button" className="ui-button-secondary" onClick={() => setMobileInfoOpen(true)}>
+                {t('mobileInfo')}
+              </button>
+              <button type="button" className="ui-button-secondary" onClick={() => setMobileLegendOpen(true)}>
+                {t('mobileLegend')}
+              </button>
+            </div>
+          </div>
+          {hintsReady && !hintState.click ? (
+            <div className="ui-map-hints ui-mobile-hints">
+              <div>{t('hintNodeTap')}</div>
+            </div>
+          ) : null}
+          {(mobileLegendOpen || mobileInfoOpen) ? (
+            <div className="ui-sheet-backdrop" onClick={() => { setMobileLegendOpen(false); setMobileInfoOpen(false); }}>
+              <div className="ui-bottom-sheet" onClick={(event) => event.stopPropagation()}>
+                <div className="flex items-center justify-between">
+                  <div className="text-[13px] font-semibold text-white/80">
+                    {mobileLegendOpen ? t('mapLegendTitle') : t('mobileInfo')}
+                  </div>
+                  <button type="button" className="ui-button-secondary" onClick={() => { setMobileLegendOpen(false); setMobileInfoOpen(false); }}>
+                    {t('close')}
+                  </button>
+                </div>
+                <div className="mt-3 ui-sheet-content">
+                  {mobileLegendOpen ? (
+                    <div className="grid gap-2 text-[13px] text-white/70">
+                      <div className="flex items-center gap-2">
+                        <span className="ui-legend-dot ui-legend-current" />
+                        {t('mapLegendCurrent')}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="ui-legend-dot ui-legend-primary" />
+                        {t('mapLegendPrimary')}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="ui-legend-dot ui-legend-secondary" />
+                        {t('mapLegendSecondary')}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="ui-legend-dot ui-legend-distant" />
+                        {t('mapLegendDistant')}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4 text-[13px] text-white/70">
+                      <div>
+                        <div className="text-[12px] uppercase tracking-wide text-white/40">{t('selectedOption')}</div>
+                        <div className="mt-2 text-[14px] text-white/90">{selectedOptionLabel}</div>
+                      </div>
+                      <div>
+                        <div className="text-[12px] uppercase tracking-wide text-white/40">{t('blockSummary')}</div>
+                        <div className="mt-2 text-[22px] font-semibold text-white">{metrics?.optionLossPct ?? 0}%</div>
+                        <div className="mt-1 text-[12px] text-white/70">
+                          {t('optionLossContext', { count: totalFutureStates })}
+                        </div>
+                        <div className="mt-3 text-[12px] uppercase tracking-wide text-white/40">{t('pointOfNoReturn')}</div>
+                        <div className="mt-1 text-[13px] text-white/80">{metrics?.pnrFlag ? t('yes') : t('no')}</div>
+                        <div className="mt-1 text-[12px] text-white/70">
+                          {metrics?.pnrFlag ? `${t('pnrYesPrefix')} ${metrics.pnrText}` : t('pnrNoText')}
+                        </div>
+                        <div className="mt-3 text-[12px] uppercase tracking-wide text-white/40">{t('mainEffectTitle')}</div>
+                        <div className="mt-1 text-[13px] text-white/80">{mainEffect || t('mainEffectEmpty')}</div>
+                      </div>
+                      <div>
+                        <div className="text-[12px] uppercase tracking-wide text-white/40">{t('blockWhy')}</div>
+                        {reasons.length ? (
+                          <div className="mt-2 grid gap-2">
+                            {reasons.map((reason) => (
+                              <button
+                                key={reason.id}
+                                type="button"
+                                className="ui-card px-3 py-2 text-left"
+                                onClick={() => handleReasonTap(reason.tags, reason.id)}
+                              >
+                                <div className="text-[13px] text-white/85">{reason.text}</div>
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="mt-2 text-[13px] text-white/60">{t('reasonsEmpty')}</div>
+                        )}
+                      </div>
+                      <div>
+                        <div className="text-[12px] uppercase tracking-wide text-white/40">{t('blockClosed')}</div>
+                        {closedTop.length ? (
+                          <div className="mt-2 grid gap-2">
+                            {(showAllClosed ? closedFuturesFlat : closedTop).map((item, index) => (
+                              <button
+                                key={`${item.title}-${index}`}
+                                type="button"
+                                className="ui-card px-3 py-2 text-left"
+                                onClick={() => handleClosedTap(item, `${item.title}-${index}`)}
+                              >
+                                <div className="text-[13px] text-white/85">{item.title}</div>
+                                {item.category ? (
+                                  <div className="mt-1 text-[12px] text-white/60">{item.category}</div>
+                                ) : null}
+                              </button>
+                            ))}
+                            {closedRest.length ? (
+                              <button
+                                type="button"
+                                className="text-left text-[12px] text-white/60"
+                                onClick={() => setShowAllClosed((prev) => !prev)}
+                              >
+                                {showAllClosed ? t('showLess') : t('showMore')}
+                              </button>
+                            ) : null}
+                          </div>
+                        ) : (
+                          <div className="mt-2 text-[13px] text-white/60">{t('closedEmpty')}</div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </main>
   );
 

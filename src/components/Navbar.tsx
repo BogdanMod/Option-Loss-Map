@@ -25,6 +25,7 @@ export default function Navbar() {
   const [promoCode, setPromoCode] = useState('');
   const [promoNotice, setPromoNotice] = useState<string | null>(null);
   const [promoLoading, setPromoLoading] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const popoverRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -59,6 +60,15 @@ export default function Navbar() {
     window.addEventListener('click', handleClick);
     return () => window.removeEventListener('click', handleClick);
   }, [profileOpen]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const media = window.matchMedia('(max-width: 768px)');
+    const update = () => setIsMobile(media.matches);
+    update();
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
 
   const isActive = (href: string) => {
     if (href === '/map' && (pathname === '/' || pathname === '/map')) return true;
@@ -104,6 +114,110 @@ export default function Navbar() {
     setPromoLoading(false);
   };
 
+  const profilePanel = (
+    <div className="ui-section p-4 text-[13px] text-white/70 shadow-soft backdrop-blur">
+      <div className="text-[13px] font-semibold uppercase tracking-wide text-white/50">
+        {t('profileTitle')}
+      </div>
+      <div className="mt-2 space-y-1">
+        <div>
+          {t('profilePlan')}: {PLAN_LABELS[plan]}
+        </div>
+        <div>
+          {t('profileSaved')}: {historyCount} / {features.historyLimit}
+        </div>
+      </div>
+
+      <div className="mt-3 text-[13px] font-semibold text-white/50">{t('profileAvailable')}</div>
+      <ul className="mt-2 space-y-1">
+        {availableItems.map((item) => (
+          <li key={item} className="flex items-center gap-2">
+            <span>✔</span>
+            <span>{item}</span>
+          </li>
+        ))}
+      </ul>
+
+      {unavailableItems.length ? (
+        <>
+          <div className="mt-3 text-[13px] font-semibold text-white/50">
+            {t('profileUnavailable')}
+          </div>
+          <ul className="mt-2 space-y-1">
+            {unavailableItems.map((item) => (
+              <li key={item} className="flex items-center gap-2">
+                <span>—</span>
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
+
+      <div className="mt-4 flex justify-end">
+        {isFree ? (
+          <Link
+            href="/upgrade"
+            className="ui-button-secondary"
+          >
+            {t('paywallUpgrade')}
+          </Link>
+        ) : null}
+      </div>
+
+      <div className="mt-4 ui-card px-3 py-3">
+        <div className="text-[13px] font-semibold text-white/50">Промокод</div>
+        <div className="mt-2 ui-promo-row">
+          <input
+            value={promoCode}
+            onChange={(event) => setPromoCode(event.target.value)}
+            placeholder="Введите код"
+            className="h-9 flex-1 rounded-[10px] border border-white/10 bg-white/5 px-3 text-[13px] text-white"
+          />
+          <button type="button" className="ui-button-secondary" onClick={handlePromoApply}>
+            {promoLoading ? '...' : 'Активировать'}
+          </button>
+        </div>
+        {promoNotice ? <div className="mt-2 text-[12px] text-white/50">{promoNotice}</div> : null}
+      </div>
+
+      {process.env.NODE_ENV !== 'production' ? (
+        <div className="mt-4 ui-card px-3 py-3">
+          <div className="text-[13px] font-semibold text-white/50">{t('planMode')}</div>
+          <div className="mt-2 flex gap-3 text-[13px] text-white/70">
+            <label className="flex items-center gap-2">
+              <input
+                type="radio"
+                name="plan"
+                checked={plan === 'free'}
+                onChange={() => {
+                  setPlan('free');
+                  setPlanNotice(t('planSwitchedFree'));
+                }}
+              />
+              {t('planFree')}
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="radio"
+                name="plan"
+                checked={plan === 'pro'}
+                onChange={() => {
+                  setPlan('pro');
+                  setPlanNotice(t('planSwitchedPro'));
+                }}
+              />
+              {t('planPaid')}
+            </label>
+          </div>
+          {planNotice ? (
+            <div className="mt-2 text-[13px] text-white/50">{planNotice}</div>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+
   return (
     <nav className="sticky top-0 z-40 border-b border-white/10 bg-ink-950/70 backdrop-blur print:hidden">
       <div className="mx-auto flex h-14 max-w-[1280px] items-center justify-between gap-6 px-8 ui-transition">
@@ -147,107 +261,22 @@ export default function Navbar() {
             П
           </button>
 
-          {profileOpen ? (
-            <div className="absolute right-0 mt-3 w-72 ui-section p-4 text-[13px] text-white/70 shadow-soft backdrop-blur ui-modal-enter">
-              <div className="text-[13px] font-semibold uppercase tracking-wide text-white/50">
-                {t('profileTitle')}
-              </div>
-              <div className="mt-2 space-y-1">
-                <div>
-                  {t('profilePlan')}: {PLAN_LABELS[plan]}
-                </div>
-                <div>
-                  {t('profileSaved')}: {historyCount} / {features.historyLimit}
-                </div>
-              </div>
-
-              <div className="mt-3 text-[13px] font-semibold text-white/50">{t('profileAvailable')}</div>
-              <ul className="mt-2 space-y-1">
-                {availableItems.map((item) => (
-                  <li key={item} className="flex items-center gap-2">
-                    <span>✔</span>
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
-
-              {unavailableItems.length ? (
-                <>
-                  <div className="mt-3 text-[13px] font-semibold text-white/50">
-                    {t('profileUnavailable')}
-                  </div>
-                  <ul className="mt-2 space-y-1">
-                    {unavailableItems.map((item) => (
-                      <li key={item} className="flex items-center gap-2">
-                        <span>—</span>
-                        <span>{item}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </>
-              ) : null}
-
-              <div className="mt-4 flex justify-end">
-                {isFree ? (
-                  <Link
-                    href="/upgrade"
-                    className="ui-button-secondary"
-                  >
-                    {t('paywallUpgrade')}
-                  </Link>
-                ) : null}
-              </div>
-
-              <div className="mt-4 ui-card px-3 py-3">
-                <div className="text-[13px] font-semibold text-white/50">Промокод</div>
-                <div className="mt-2 ui-promo-row">
-                  <input
-                    value={promoCode}
-                    onChange={(event) => setPromoCode(event.target.value)}
-                    placeholder="Введите код"
-                    className="h-9 flex-1 rounded-[10px] border border-white/10 bg-white/5 px-3 text-[13px] text-white"
-                  />
-                  <button type="button" className="ui-button-secondary" onClick={handlePromoApply}>
-                    {promoLoading ? '...' : 'Активировать'}
+          {profileOpen && !isMobile ? (
+            <div className="absolute right-0 mt-3 w-72 ui-modal-enter">
+              {profilePanel}
+            </div>
+          ) : null}
+          {profileOpen && isMobile ? (
+            <div className="ui-sheet-backdrop" onClick={() => setProfileOpen(false)}>
+              <div className="ui-bottom-sheet" onClick={(event) => event.stopPropagation()}>
+                <div className="flex items-center justify-between">
+                  <div className="text-[13px] font-semibold text-white/80">{t('profileTitle')}</div>
+                  <button type="button" className="ui-button-secondary" onClick={() => setProfileOpen(false)}>
+                    {t('close')}
                   </button>
                 </div>
-                {promoNotice ? <div className="mt-2 text-[12px] text-white/50">{promoNotice}</div> : null}
+                <div className="mt-3 ui-sheet-content">{profilePanel}</div>
               </div>
-
-              {process.env.NODE_ENV !== 'production' ? (
-                <div className="mt-4 ui-card px-3 py-3">
-                  <div className="text-[13px] font-semibold text-white/50">{t('planMode')}</div>
-                  <div className="mt-2 flex gap-3 text-[13px] text-white/70">
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="radio"
-                        name="plan"
-                        checked={plan === 'free'}
-                        onChange={() => {
-                          setPlan('free');
-                          setPlanNotice(t('planSwitchedFree'));
-                        }}
-                      />
-                      {t('planFree')}
-                    </label>
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="radio"
-                        name="plan"
-                        checked={plan === 'pro'}
-                        onChange={() => {
-                          setPlan('pro');
-                          setPlanNotice(t('planSwitchedPro'));
-                        }}
-                      />
-                      {t('planPaid')}
-                    </label>
-                  </div>
-                  {planNotice ? (
-                    <div className="mt-2 text-[13px] text-white/50">{planNotice}</div>
-                  ) : null}
-                </div>
-              ) : null}
             </div>
           ) : null}
         </div>
