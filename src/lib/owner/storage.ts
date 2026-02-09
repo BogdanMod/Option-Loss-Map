@@ -73,6 +73,20 @@ export const getMetrics = async () => {
   return { activeSessions, mapBuilt, exportsCount };
 };
 
+export const getLastEvent = async (): Promise<AnalyticsEvent | null> => {
+  if (hasKV) {
+    const entries = (await kv.lrange('events:log', 0, 0)) as string[];
+    const raw = entries?.[0];
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw) as AnalyticsEvent;
+    } catch {
+      return null;
+    }
+  }
+  return memoryStore.events[0] ?? null;
+};
+
 export const savePromo = async (promo: PromoCode) => {
   const normalized = { ...promo, code: promo.code.toLowerCase() };
   if (hasKV) {
