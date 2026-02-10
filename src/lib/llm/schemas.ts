@@ -176,16 +176,6 @@ export const FutureStateArrayJsonSchema = {
   }
 } as const;
 
-export const ZerconNodeSchema = z.object({
-  title: z.string().min(1),
-  description: z.string().min(1),
-  consequence: z.string().min(1),
-  severity: z.enum(['low', 'medium', 'high']).optional(),
-  irreversibility: z.array(z.enum(['F', 'T', 'O', 'S'])).optional()
-});
-
-export type ZerconNode = z.infer<typeof ZerconNodeSchema>;
-
 export const ZerconNodeJsonSchema = {
   name: 'zercon_node',
   schema: {
