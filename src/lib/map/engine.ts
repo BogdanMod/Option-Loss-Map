@@ -287,6 +287,7 @@ export function buildMapFromDecision(input: DecisionInput): MapModel {
       type: 'future',
       title: template.title,
       description: template.subtitle,
+      detail: template.subtitle || '', // Будет переписано ZerCon если слабый
       optionId: option.id,
       tags: template.tags
     }));
