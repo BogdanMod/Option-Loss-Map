@@ -256,7 +256,7 @@ function MapPageInner() {
     return mapModel.nodes.find((node) => node.id === chosenId) ?? null;
   }, [mapModel, selectedOptionId]);
 
-  const mainEffect = buildMainEffect(metrics, dominantMerged?.label);
+  const mainEffect = buildMainEffect(metrics, dominantMerged?.title);
   const reasons = buildReasons(optionTags, llmExtracted);
   const closedFuturesFlat = useMemo(() => {
     const all = selectedOption?.closedFutures ?? [];
