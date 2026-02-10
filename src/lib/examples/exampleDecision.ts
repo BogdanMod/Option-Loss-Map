@@ -38,3 +38,9 @@ export const exampleDecisionInputs: DecisionInput[] = [
 
 export const getExampleDecisionInput = (index: number) =>
   exampleDecisionInputs[index % exampleDecisionInputs.length] ?? exampleDecisionInputs[0];
+
+// Map example indices to ZerCon example keys
+export const getZerconExampleKey = (index: number): string | null => {
+  const keys: (string | null)[] = ['hiring', 'product', 'career'];
+  return keys[index % keys.length] ?? null;
+};

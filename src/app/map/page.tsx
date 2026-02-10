@@ -9,7 +9,8 @@ import { useSearchParams } from 'next/navigation';
 import { t } from '@/lib/i18n';
 import { MapModelSchema } from '@/lib/map/schema';
 import type { DecisionInput } from '@/lib/map/engine';
-import { exampleDecisionInputs, getExampleDecisionInput } from '@/lib/examples/exampleDecision';
+import { exampleDecisionInputs, getExampleDecisionInput, getZerconExampleKey } from '@/lib/examples/exampleDecision';
+import { zerconExampleMaps, buildMapFromZerconExample } from '@/lib/examples/zerconExampleMap';
 import type { MapEdge, MapModel, MapNode } from '@/lib/map/types';
 import type { DecisionRecord } from '@/lib/history/types';
 import { summarizeMap } from '@/lib/history/summarize';
@@ -185,6 +186,7 @@ function MapPageInner() {
   const [activeOptionIndex, setActiveOptionIndex] = useState<number | null>(null);
   const [editorMode, setEditorMode] = useState<'mine' | 'example'>('mine');
   const [exampleIndex, setExampleIndex] = useState(0);
+  const [zerconMainEffect, setZerconMainEffect] = useState<string | null>(null);
   const prevInputRef = useRef<DecisionInput | null>(null);
   const prevScreenStateRef = useRef<'empty' | 'input' | 'analysis'>('empty');
   const [highlightMode, setHighlightMode] = useState<'none' | 'closedFuture' | 'reason' | 'metric'>('none');
@@ -256,7 +258,7 @@ function MapPageInner() {
     return mapModel.nodes.find((node) => node.id === chosenId) ?? null;
   }, [mapModel, selectedOptionId]);
 
-  const mainEffect = buildMainEffect(metrics, dominantMerged?.title);
+  const mainEffect = zerconMainEffect || buildMainEffect(metrics, dominantMerged?.title);
   const reasons = buildReasons(optionTags, llmExtracted);
   const closedFuturesFlat = useMemo(() => {
     const all = selectedOption?.closedFutures ?? [];
@@ -392,36 +394,54 @@ function MapPageInner() {
       }
       const nextIndex = typeof overrideIndex === 'number' ? overrideIndex : exampleIndex;
       const exampleInput = getExampleDecisionInput(nextIndex);
-      const response = await fetch('/api/build-map', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(exampleInput)
-      });
+      const zerconKey = getZerconExampleKey(nextIndex);
+      
+      let map: MapModel;
+      let extracted: unknown = null;
 
-      if (!response.ok) {
-        const data = (await response.json()) as { message?: string };
-        throw new Error(data?.message || t('errorBuildMessage'));
+      // Use ZerCon example if available
+      if (zerconKey && zerconExampleMaps[zerconKey]) {
+        const zerconExample = zerconExampleMaps[zerconKey];
+        map = buildMapFromZerconExample(zerconExample, exampleInput);
+        MapModelSchema.parse(map);
+        setZerconMainEffect(zerconExample.mainEffect);
+      } else {
+        setZerconMainEffect(null);
+        // Fallback to API call
+        const response = await fetch('/api/build-map', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(exampleInput)
+        });
+
+        if (!response.ok) {
+          const data = (await response.json()) as { message?: string };
+          throw new Error(data?.message || t('errorBuildMessage'));
+        }
+
+        const data = (await response.json()) as { map: MapModel; extracted?: unknown };
+        MapModelSchema.parse(data.map);
+        map = data.map;
+        extracted = data.extracted ?? null;
       }
 
-      const data = (await response.json()) as { map: MapModel; extracted?: unknown };
-      MapModelSchema.parse(data.map);
-      const demoEdges = data.map.edges.filter(
+      const demoEdges = map.edges.filter(
         (edge) =>
-          edge.optionId === (data.map.summary.bestForOptionsPreserved || exampleInput.options[0]?.id || 'A')
+          edge.optionId === (map.summary.bestForOptionsPreserved || exampleInput.options[0]?.id || 'A')
       );
       const demoNodeIds = new Set<string>();
       demoEdges.forEach((edge) => {
         demoNodeIds.add(edge.source);
         demoNodeIds.add(edge.target);
       });
-      setMapModel(data.map);
+      setMapModel(map);
       setMapVersion((prev) => prev + 1);
       setFocusedNode(null);
-      setSelectedOptionId(data.map.summary.bestForOptionsPreserved || exampleInput.options[0]?.id || 'A');
+      setSelectedOptionId(map.summary.bestForOptionsPreserved || exampleInput.options[0]?.id || 'A');
       setError(null);
       setInput(exampleInput);
       setExampleIndex(nextIndex);
-      setLlmExtracted(data.extracted ?? null);
+      setLlmExtracted(extracted);
       setIsDemoView(true);
       setEditorMode('example');
       setHighlightMode('reason');
@@ -452,6 +472,7 @@ function MapPageInner() {
     }
     setMapModel(null);
     setSelectedOptionId('');
+    setZerconMainEffect(null);
   };
 
   const handleSaveHistory = () => {
