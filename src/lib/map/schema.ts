@@ -7,13 +7,16 @@ export const MapNodeSchema = z.object({
   id: z.string().min(1),
   type: NodeTypeSchema,
   title: z.string().min(1),
-  description: z.string().optional(),
-  consequence: z.string().optional(),
-  fixation: z.string().optional(), // Hover-level 2: развёрнутая фиксация необратимости
+  summary: z.string().optional(),
+  detail: z.string().min(1), // Обязательно для hover-level 2
+  description: z.string().optional(), // Legacy
+  consequence: z.string().optional(), // Legacy
+  fixation: z.string().optional(), // Legacy: алиас для detail
   severity: z.enum(['low', 'medium', 'high']).optional(),
   irreversibility: z.array(z.enum(['F', 'T', 'O', 'S'])).optional(),
   optionId: z.string().optional(),
   tags: z.array(z.string()).optional(),
+  signals: z.array(z.string()).optional(),
   meta: z.record(z.unknown()).optional()
 });
 

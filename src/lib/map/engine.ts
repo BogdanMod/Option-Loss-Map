@@ -264,6 +264,7 @@ export function buildMapFromDecision(input: DecisionInput): MapModel {
     type: 'current',
     title: input.title || 'Текущее состояние',
     description: input.currentStateText,
+    detail: input.currentStateText || '', // Будет переписано ZerCon если слабый
     tags: ['current_state']
   };
   nodes.push(currentNode);
@@ -301,6 +302,7 @@ export function buildMapFromDecision(input: DecisionInput): MapModel {
           type: 'merged',
           title: macroGroupLabel(signature),
           description: 'Назад дороги почти не остаётся. Любой откат требует времени и денег.',
+          detail: 'Назад дороги почти не остаётся. Любой откат требует времени и денег.', // Будет переписано ZerCon если слабый
           tags: ['merge', signature]
         };
       }
@@ -488,6 +490,197 @@ const buildEvidenceFromSources = (input: DecisionInput, extracted: ExtractedDeci
   return unique.slice(0, 4);
 };
 
+// Создание Anchor Pack для grounding
+export type AnchorPack = {
+  decisionTitle: string;
+  decisionDescription: string;
+  options: Array<{ id: string; label: string; description: string }>;
+  constraints: string[];
+  actors: string[];
+  resources: string[];
+  obligations: string[];
+  irreversibleSignals: {
+    financial: string[];
+    time: string[];
+    organizational: string[];
+    strategic: string[];
+  };
+  normalizedAnchors: string[]; // Нормализованные ключевые фразы для проверки
+};
+
+// Стоп-слова для нормализации
+const STOP_WORDS = new Set([
+  'и',
+  'в',
+  'на',
+  'с',
+  'по',
+  'для',
+  'от',
+  'до',
+  'из',
+  'к',
+  'о',
+  'об',
+  'при',
+  'про',
+  'со',
+  'то',
+  'что',
+  'как',
+  'так',
+  'это',
+  'этот',
+  'эта',
+  'эти',
+  'этот',
+  'быть',
+  'есть',
+  'был',
+  'была',
+  'было',
+  'были',
+  'стать',
+  'становиться',
+  'становится'
+]);
+
+// Нормализация текста для anchors
+function normalizeAnchor(text: string): string[] {
+  return text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .split(/\s+/)
+    .filter((word) => word.length > 2 && !STOP_WORDS.has(word))
+    .filter(Boolean);
+}
+
+// Извлечение ключевых фраз (2-3 слова)
+function extractKeyPhrases(words: string[]): string[] {
+  const phrases: string[] = [];
+  for (let i = 0; i < words.length - 1; i++) {
+    phrases.push(`${words[i]} ${words[i + 1]}`);
+    if (i < words.length - 2) {
+      phrases.push(`${words[i]} ${words[i + 1]} ${words[i + 2]}`);
+    }
+  }
+  return phrases;
+}
+
+export function buildAnchorPack(input: DecisionInput, extracted: ExtractedDecision | null): AnchorPack {
+  const anchors: string[] = [];
+
+  // Decision title и description
+  if (input.title) {
+    anchors.push(input.title);
+    const titleWords = normalizeAnchor(input.title);
+    anchors.push(...extractKeyPhrases(titleWords));
+  }
+  if (input.currentStateText) {
+    anchors.push(input.currentStateText);
+    const descWords = normalizeAnchor(input.currentStateText);
+    anchors.push(...extractKeyPhrases(descWords));
+  }
+
+  // Options
+  input.options.forEach((opt) => {
+    if (opt.label) {
+      anchors.push(opt.label);
+      const labelWords = normalizeAnchor(opt.label);
+      anchors.push(...extractKeyPhrases(labelWords));
+    }
+    if (opt.description) {
+      anchors.push(opt.description);
+      const descWords = normalizeAnchor(opt.description);
+      anchors.push(...extractKeyPhrases(descWords));
+    }
+  });
+
+  // Constraints
+  input.constraints.forEach((constraint) => {
+    if (constraint.trim()) {
+      anchors.push(constraint);
+      const constraintWords = normalizeAnchor(constraint);
+      anchors.push(...extractKeyPhrases(constraintWords));
+    }
+  });
+
+  // Extracted data
+  if (extracted) {
+    extracted.actors.forEach((actor) => {
+      if (actor.trim()) {
+        anchors.push(actor);
+        const actorWords = normalizeAnchor(actor);
+        anchors.push(...extractKeyPhrases(actorWords));
+      }
+    });
+    extracted.resources.forEach((resource) => {
+      if (resource.trim()) {
+        anchors.push(resource);
+        const resourceWords = normalizeAnchor(resource);
+        anchors.push(...extractKeyPhrases(resourceWords));
+      }
+    });
+    extracted.commitments.forEach((commitment) => {
+      if (commitment.trim()) {
+        anchors.push(commitment);
+        const commitmentWords = normalizeAnchor(commitment);
+        anchors.push(...extractKeyPhrases(commitmentWords));
+      }
+    });
+    [
+      ...extracted.irreversibilitySignals.financial,
+      ...extracted.irreversibilitySignals.time,
+      ...extracted.irreversibilitySignals.organizational,
+      ...extracted.irreversibilitySignals.strategic
+    ].forEach((signal) => {
+      if (signal.trim()) {
+        anchors.push(signal);
+        const signalWords = normalizeAnchor(signal);
+        anchors.push(...extractKeyPhrases(signalWords));
+      }
+    });
+  }
+
+  // Удаляем дубликаты и нормализуем
+  const normalizedAnchors = Array.from(
+    new Set(
+      anchors
+        .map((anchor) => anchor.toLowerCase().trim())
+        .filter((anchor) => anchor.length > 3)
+        .filter((anchor) => !STOP_WORDS.has(anchor))
+    )
+  ).sort();
+
+  return {
+    decisionTitle: input.title,
+    decisionDescription: input.currentStateText,
+    options: input.options.map((opt) => ({
+      id: opt.id,
+      label: opt.label,
+      description: opt.description || ''
+    })),
+    constraints: input.constraints.filter(Boolean),
+    actors: extracted?.actors || [],
+    resources: extracted?.resources || [],
+    obligations: extracted?.commitments || [],
+    irreversibleSignals: extracted
+      ? {
+          financial: extracted.irreversibilitySignals.financial,
+          time: extracted.irreversibilitySignals.time,
+          organizational: extracted.irreversibilitySignals.organizational,
+          strategic: extracted.irreversibilitySignals.strategic
+        }
+      : {
+          financial: [],
+          time: [],
+          organizational: [],
+          strategic: []
+        },
+    normalizedAnchors
+  };
+}
+
 export async function buildMapFromDecisionLLM(
   input: DecisionInput
 ): Promise<{ map: MapModel; extracted: ExtractedDecision | null; llmUsed: boolean }> {
@@ -531,7 +724,8 @@ export async function buildMapFromDecisionLLM(
       edge.evidence = evidence;
     });
 
-    const enriched = await applyZerconLanguage(baseMap, input.title, input.currentStateText);
+    const anchorPack = buildAnchorPack(input, extracted);
+    const enriched = await applyZerconLanguage(baseMap, input.title, input.currentStateText, input, extracted, anchorPack);
     return { map: enriched, extracted, llmUsed: true };
   } catch (error) {
     console.error('buildMapFromDecisionLLM fallback:', error);

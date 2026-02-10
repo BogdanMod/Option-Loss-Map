@@ -176,6 +176,16 @@ export const FutureStateArrayJsonSchema = {
   }
 } as const;
 
+export const ZerconNodeSchema = z.object({
+  title: z.string().min(1),
+  description: z.string().min(1),
+  consequence: z.string().min(1),
+  severity: z.enum(['low', 'medium', 'high']).optional(),
+  irreversibility: z.array(z.enum(['F', 'T', 'O', 'S'])).optional()
+});
+
+export type ZerconNode = z.infer<typeof ZerconNodeSchema>;
+
 export const ZerconNodeJsonSchema = {
   name: 'zercon_node',
   schema: {
@@ -189,5 +199,55 @@ export const ZerconNodeJsonSchema = {
       irreversibility: { type: 'array', items: { type: 'string', enum: ['F', 'T', 'O', 'S'] } }
     },
     required: ['title', 'description', 'consequence']
+  }
+} as const;
+
+// ZerCon Rewrite v2: батч-схема
+export const ZerconRewriteNodeSchema = z.object({
+  id: z.string().min(1),
+  title: z.string().min(1),
+  summary: z.string().optional(),
+  detail: z.string().min(120), // Минимум 120 символов для hover-level 2
+  measureType: z.enum(['time', 'money', 'role', 'process', 'contract']).optional(),
+  evidence: z.array(z.string()).default([]), // Якоря из anchors, использованные в detail
+  tags: z.array(z.string()).optional(),
+  signals: z.array(z.string()).optional()
+});
+
+export type ZerconRewriteNode = z.infer<typeof ZerconRewriteNodeSchema>;
+
+export const ZerconRewriteBatchSchema = z.object({
+  nodes: z.array(ZerconRewriteNodeSchema).min(1)
+});
+
+export type ZerconRewriteBatch = z.infer<typeof ZerconRewriteBatchSchema>;
+
+export const ZerconRewriteBatchJsonSchema = {
+  name: 'zercon_rewrite_batch',
+  schema: {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      nodes: {
+        type: 'array',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            id: { type: 'string' },
+            title: { type: 'string' },
+            summary: { type: 'string' },
+            detail: { type: 'string' },
+            measureType: { type: 'string', enum: ['time', 'money', 'role', 'process', 'contract'] },
+            evidence: { type: 'array', items: { type: 'string' } },
+            tags: { type: 'array', items: { type: 'string' } },
+            signals: { type: 'array', items: { type: 'string' } }
+          },
+          required: ['id', 'title', 'detail', 'evidence']
+        },
+        minItems: 1
+      }
+    },
+    required: ['nodes']
   }
 } as const;

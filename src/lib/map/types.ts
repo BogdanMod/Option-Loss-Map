@@ -6,13 +6,16 @@ export type MapNode = {
   id: string;
   type: NodeType;
   title: string;
-  description?: string;
-  consequence?: string;
-  fixation?: string; // Hover-level 2: развёрнутая фиксация необратимости
+  summary?: string; // Краткое резюме (1 строка)
+  detail: string; // Hover-level 2: развёрнутая фиксация (обязательно, 2-4 предложения)
+  description?: string; // Legacy: для обратной совместимости
+  consequence?: string; // Legacy: для обратной совместимости
+  fixation?: string; // Legacy: алиас для detail
   severity?: 'low' | 'medium' | 'high';
   irreversibility?: Array<'F' | 'T' | 'O' | 'S'>;
   optionId?: string;
   tags?: string[];
+  signals?: string[]; // Сигналы необратимости (F/T/O/S в текстовом виде)
   meta?: Record<string, unknown>;
 };
 

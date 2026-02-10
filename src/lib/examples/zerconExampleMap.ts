@@ -251,7 +251,8 @@ export function buildMapFromZerconExample(
     title: example.decision.title,
     description: example.decision.description,
     consequence: example.decision.consequence,
-    fixation: example.decision.fixation,
+    detail: example.decision.fixation || example.decision.consequence || example.decision.description || '',
+    fixation: example.decision.fixation, // Legacy alias
     tags: ['current_state']
   };
   nodes.push(currentNode);
@@ -263,7 +264,8 @@ export function buildMapFromZerconExample(
     title: state.title,
     description: state.description,
     consequence: state.consequence,
-    fixation: state.fixation,
+    detail: state.fixation || state.consequence || state.description || '',
+    fixation: state.fixation, // Legacy alias
     severity: state.severity,
     irreversibility: state.irreversibility,
     optionId: state.optionId || input.options[0]?.id || 'A',
@@ -278,7 +280,8 @@ export function buildMapFromZerconExample(
     title: state.title,
     description: state.description,
     consequence: state.consequence,
-    fixation: state.fixation,
+    detail: state.fixation || state.consequence || state.description || '',
+    fixation: state.fixation, // Legacy alias
     tags: ['merged', 'lock_in']
   }));
   nodes.push(...mergedNodes);
