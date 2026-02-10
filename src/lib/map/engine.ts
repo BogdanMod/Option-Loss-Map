@@ -95,17 +95,17 @@ const macroGroupSignature = (tags: string[]) => {
 const macroGroupLabel = (signature: string) => {
   switch (signature) {
     case 'platform_lock':
-      return 'Фиксация платформы';
+      return 'Платформа становится дорогим якорем';
     case 'org_inertia':
-      return 'Организационная инерция';
+      return 'Согласования начинают съедать скорость';
     case 'strategic_closure':
-      return 'Стратегическое сужение';
+      return 'Альтернативы закрываются надолго';
     case 'fast_start':
-      return 'Быстрый запуск';
+      return 'Быстрый старт оставляет долг';
     case 'scope_growth':
-      return 'Расширение скоупа';
+      return 'Объём работ начинает расползаться';
     default:
-      return 'Стабилизация';
+      return 'Откат становится дорогим';
   }
 };
 
@@ -300,7 +300,7 @@ export function buildMapFromDecision(input: DecisionInput): MapModel {
           id: `merged-${signature}`,
           type: 'merged',
           title: macroGroupLabel(signature),
-          description: 'Сходятся траектории + фиксация',
+          description: 'Назад дороги почти не остаётся. Любой откат требует времени и денег.',
           tags: ['merge', signature]
         };
       }
