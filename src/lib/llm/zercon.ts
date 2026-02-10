@@ -186,16 +186,21 @@ export function validateZerconNodeText(node: MapNode): { valid: boolean; needsFa
   return { valid: true, needsFallback: false };
 }
 
-// Генерация кэш-ключа для батча
+// Генерация кэш-ключа для батча (включает originalTitle+originalDetail+decisionTitle+variantLabel+nodeKind)
 function generateCacheKey(
   nodeIds: string[],
   originalTexts: string[],
   extractedHash: string,
-  version: string = 'zercon_v2'
+  decisionTitle: string,
+  variantLabels: string[],
+  nodeKinds: string[],
+  version: string = 'zercon_v2_grounded'
 ): string {
   const ids = nodeIds.sort().join('|');
   const texts = originalTexts.join('||');
-  return `${version}::${extractedHash}::${ids}::${texts}`;
+  const variants = variantLabels.sort().join('|');
+  const kinds = nodeKinds.sort().join('|');
+  return `${version}::${extractedHash}::${decisionTitle}::${variants}::${kinds}::${ids}::${texts}`;
 }
 
 // Простой хэш для extracted (для кэша)
@@ -218,6 +223,102 @@ function hashExtracted(extracted: ExtractedDecision | null): string {
 }
 
 const cache = new Map<string, ZerconRewriteBatch>();
+
+// Нормализация текста для overlap проверки
+const STOP_WORDS_OVERLAP = new Set([
+  'и',
+  'в',
+  'на',
+  'с',
+  'по',
+  'для',
+  'от',
+  'до',
+  'из',
+  'к',
+  'о',
+  'об',
+  'при',
+  'про',
+  'со',
+  'то',
+  'что',
+  'как',
+  'так',
+  'это',
+  'этот',
+  'эта',
+  'эти',
+  'быть',
+  'есть',
+  'был',
+  'была',
+  'было',
+  'были',
+  'стать',
+  'становиться',
+  'становится',
+  'не',
+  'нет',
+  'без',
+  'или',
+  'а',
+  'но',
+  'же',
+  'ли',
+  'уже',
+  'ещё',
+  'еще',
+  'все',
+  'всё',
+  'всего',
+  'всего',
+  'только',
+  'можно',
+  'нужно',
+  'должен',
+  'должна',
+  'должно',
+  'должны'
+]);
+
+function extractSignificantTokens(text: string): Set<string> {
+  return new Set(
+    text
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+      .split(/\s+/)
+      .filter((word) => word.length >= 3 && !STOP_WORDS_OVERLAP.has(word))
+      .filter(Boolean)
+  );
+}
+
+// Hard guard: проверка overlap для защиты от галлюцинаций
+export function calculateOverlapRatio(
+  responseText: string,
+  allowedTokens: Set<string>
+): number {
+  const responseTokens = extractSignificantTokens(responseText);
+  if (responseTokens.size === 0) return 0;
+
+  let matches = 0;
+  responseTokens.forEach((token) => {
+    // Проверяем точное совпадение
+    if (allowedTokens.has(token)) {
+      matches += 1;
+      return;
+    }
+    // Проверяем частичное совпадение (токен содержит или содержится в allowed)
+    for (const allowed of allowedTokens) {
+      if (token.includes(allowed) || allowed.includes(token)) {
+        matches += 1;
+        return;
+      }
+    }
+  });
+
+  return matches / responseTokens.size;
+}
 
 // Проверка релевантности узла: считает overlap между evidence и anchors
 function calculateRelevanceScore(
@@ -256,7 +357,7 @@ function calculateRelevanceScore(
   return { score, hasMeasurability, anchorMatches };
 }
 
-// Применение ZerCon Rewrite v2 к батчу узлов
+// Применение ZerCon Rewrite v2 к батчу узлов (строгий перефразер с hard guard)
 async function applyZerconRewriteBatch(
   nodes: MapNode[],
   context: {
@@ -273,7 +374,21 @@ async function applyZerconRewriteBatch(
   const extractedHash = hashExtracted(context.extracted);
   const nodeIds = nodes.map((n) => n.id);
   const originalTexts = nodes.map((n) => `${n.title}::${n.detail || n.fixation || n.description || ''}`);
-  const cacheKey = generateCacheKey(nodeIds, originalTexts, extractedHash);
+  const variantLabels = nodes
+    .map((n) => {
+      const opt = context.options.find((o) => o.id === n.optionId);
+      return opt?.label || '';
+    })
+    .filter(Boolean);
+  const nodeKinds = nodes.map((n) => n.type || 'unknown');
+  const cacheKey = generateCacheKey(
+    nodeIds,
+    originalTexts,
+    extractedHash,
+    context.decisionTitle,
+    variantLabels,
+    nodeKinds
+  );
 
   // Проверка кэша
   if (cache.has(cacheKey)) {
@@ -284,6 +399,23 @@ async function applyZerconRewriteBatch(
     });
     return result;
   }
+
+  // Собираем allowed tokens для hard guard
+  const allowedTexts = [
+    context.decisionTitle,
+    context.currentState,
+    ...context.constraints,
+    ...context.options.map((o) => `${o.label} ${o.description || ''}`).filter(Boolean),
+    ...(context.extracted?.actors || []),
+    ...(context.extracted?.resources || []),
+    ...(context.extracted?.commitments || []),
+    ...(context.anchorPack.normalizedAnchors || [])
+  ].filter(Boolean);
+  const allowedTokens = new Set<string>();
+  allowedTexts.forEach((text) => {
+    const tokens = extractSignificantTokens(text);
+    tokens.forEach((token) => allowedTokens.add(token));
+  });
 
   try {
     const prompt = buildZerconRewritePromptV2(nodes, context, strictMode);
@@ -298,12 +430,79 @@ async function applyZerconRewriteBatch(
     });
 
     const parsed = ZerconRewriteBatchSchema.parse(result);
-    if (!strictMode) {
-      cache.set(cacheKey, parsed);
+
+    // Hard guard: проверка релевантности для каждого узла
+    const validatedNodes: ZerconRewriteNode[] = [];
+    const nodesNeedingFallback: MapNode[] = [];
+
+    parsed.nodes.forEach((rewrittenNode) => {
+      const originalNode = nodes.find((n) => n.id === rewrittenNode.id);
+      if (!originalNode) {
+        validatedNodes.push(rewrittenNode);
+        return;
+      }
+
+      // Проверяем relevance_score и uncertainty из ответа LLM
+      const llmRelevanceScore = rewrittenNode.relevance_score ?? 0;
+      const llmUncertainty = rewrittenNode.uncertainty ?? 'high';
+
+      // Проверяем overlap ratio (hard guard)
+      const combinedText = `${rewrittenNode.title} ${rewrittenNode.detail}`;
+      const overlapRatio = calculateOverlapRatio(combinedText, allowedTokens);
+
+      // Проверяем маркер измеримости
+      const hasMeasurability = hasMeasurabilityMarkers(rewrittenNode.detail);
+
+      // Критерии отклонения:
+      // - relevance_score < 0.6 ИЛИ uncertainty == "high" ИЛИ overlap_ratio < 0.18
+      const shouldReject =
+        llmRelevanceScore < 0.6 ||
+        llmUncertainty === 'high' ||
+        overlapRatio < 0.18 ||
+        !hasMeasurability;
+
+      if (shouldReject) {
+        if (process.env.NODE_ENV === 'development') {
+          console.warn(
+            `[ZerCon] Node ${rewrittenNode.id} rejected: relevance=${llmRelevanceScore}, uncertainty=${llmUncertainty}, overlap=${overlapRatio.toFixed(2)}, hasMeasurability=${hasMeasurability}`
+          );
+        }
+        nodesNeedingFallback.push(originalNode);
+      } else {
+        validatedNodes.push(rewrittenNode);
+      }
+    });
+
+    // Для отклонённых узлов используем fallback
+    nodesNeedingFallback.forEach((node) => {
+      const fallback = generateSafeFallbackDetail(node, context.anchorPack, {
+        title: context.decisionTitle,
+        currentState: context.currentState
+      });
+      // Добавляем measurable_marker в конец detail, если его нет
+      const detailWithMarker = fallback.detail + (fallback.detail.includes(fallback.measureType) ? '' : ` (${fallback.measureType})`);
+      validatedNodes.push({
+        id: node.id,
+        title: node.title, // Сохраняем оригинальный title
+        detail: detailWithMarker,
+        measurable_marker: `через 4–12 недель`, // Нейтральный маркер
+        relevance_score: 0.5,
+        uncertainty: 'high',
+        notes: 'Fallback: низкая релевантность LLM ответа',
+        measureType: fallback.measureType,
+        evidence: fallback.evidence,
+        tags: node.tags,
+        signals: node.signals
+      });
+    });
+
+    // Обновляем кэш только если все узлы прошли валидацию
+    if (nodesNeedingFallback.length === 0 && !strictMode) {
+      cache.set(cacheKey, { nodes: validatedNodes });
     }
 
     const resultMap = new Map<string, ZerconRewriteNode>();
-    parsed.nodes.forEach((node) => {
+    validatedNodes.forEach((node) => {
       resultMap.set(node.id, node);
     });
 
@@ -383,16 +582,15 @@ export async function applyZerconLanguage(
     const isWeak = isNodeWeak(node);
     const isCurrent = node.type === 'current';
 
-    // Переписываем слабые узлы, current только если слабый
+    // НЕ переписываем current node (как указано в требованиях)
     if (isCurrent) {
-      if (isWeak) {
-        nodesToRewrite.push(node);
-      }
-    } else {
-      // Для future/merged переписываем если слабый
-      if (isWeak) {
-        nodesToRewrite.push(node);
-      }
+      // Пропускаем current node
+      return;
+    }
+
+    // Для future/merged переписываем если слабый
+    if (isWeak) {
+      nodesToRewrite.push(node);
     }
   });
 
@@ -537,6 +735,10 @@ export async function applyZerconLanguage(
                   id,
                   title: originalNode.title,
                   detail: fallback.detail,
+                  measurable_marker: 'через 4–12 недель', // Нейтральный маркер
+                  relevance_score: 0.5,
+                  uncertainty: 'high',
+                  notes: 'Fallback: низкая релевантность LLM ответа',
                   measureType: fallback.measureType,
                   evidence: fallback.evidence
                 });
@@ -557,6 +759,10 @@ export async function applyZerconLanguage(
               id: node.id,
               title: node.title,
               detail: fallback.detail,
+              measurable_marker: 'через 4–12 недель', // Нейтральный маркер
+              relevance_score: 0.5,
+              uncertainty: 'high',
+              notes: 'Fallback: ошибка retry',
               measureType: fallback.measureType,
               evidence: fallback.evidence
             });
@@ -575,6 +781,10 @@ export async function applyZerconLanguage(
           id: node.id,
           title: node.title,
           detail: fallback.detail,
+          measurable_marker: 'через 4–12 недель', // Нейтральный маркер
+          relevance_score: 0.5,
+          uncertainty: 'high',
+          notes: 'Fallback: ошибка батча',
           measureType: fallback.measureType,
           evidence: fallback.evidence
         });
@@ -606,6 +816,10 @@ export async function applyZerconLanguage(
           rawTitle: node.title,
           rawDescription: node.description,
           rawDetail: node.detail || node.fixation,
+          measurable_marker: rewrite.measurable_marker,
+          relevance_score: rewrite.relevance_score,
+          uncertainty: rewrite.uncertainty,
+          notes: rewrite.notes,
           zerconApplied: true,
           zerconVersion: 'v2',
           // Диагностика в dev режиме

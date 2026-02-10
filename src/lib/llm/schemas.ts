@@ -192,12 +192,16 @@ export const ZerconNodeJsonSchema = {
   }
 } as const;
 
-// ZerCon Rewrite v2: батч-схема
+// ZerCon Rewrite v2: батч-схема (строгий перефразер)
 export const ZerconRewriteNodeSchema = z.object({
   id: z.string().min(1),
   title: z.string().min(1),
   summary: z.string().optional(),
   detail: z.string().min(120), // Минимум 120 символов для hover-level 2
+  measurable_marker: z.string().min(1), // Явный маркер измеримости (отдельное поле)
+  relevance_score: z.number().min(0).max(1), // 0..1, насколько релевантен исходному смыслу
+  uncertainty: z.enum(['low', 'medium', 'high']), // Уровень неопределённости
+  notes: z.string().optional(), // Примечания (если есть)
   measureType: z.enum(['time', 'money', 'role', 'process', 'contract']).optional(),
   evidence: z.array(z.string()).default([]), // Якоря из anchors, использованные в detail
   tags: z.array(z.string()).optional(),
@@ -228,12 +232,16 @@ export const ZerconRewriteBatchJsonSchema = {
             title: { type: 'string' },
             summary: { type: 'string' },
             detail: { type: 'string' },
+            measurable_marker: { type: 'string' },
+            relevance_score: { type: 'number', minimum: 0, maximum: 1 },
+            uncertainty: { type: 'string', enum: ['low', 'medium', 'high'] },
+            notes: { type: 'string' },
             measureType: { type: 'string', enum: ['time', 'money', 'role', 'process', 'contract'] },
             evidence: { type: 'array', items: { type: 'string' } },
             tags: { type: 'array', items: { type: 'string' } },
             signals: { type: 'array', items: { type: 'string' } }
           },
-          required: ['id', 'title', 'detail', 'evidence']
+          required: ['id', 'title', 'detail', 'measurable_marker', 'relevance_score', 'uncertainty', 'evidence']
         },
         minItems: 1
       }
