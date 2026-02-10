@@ -5,8 +5,11 @@ export type Confidence = 'low' | 'medium' | 'high';
 export type MapNode = {
   id: string;
   type: NodeType;
-  label: string;
-  subtitle?: string;
+  title: string;
+  description?: string;
+  consequence?: string;
+  severity?: 'low' | 'medium' | 'high';
+  irreversibility?: Array<'F' | 'T' | 'O' | 'S'>;
   optionId?: string;
   tags?: string[];
   meta?: Record<string, unknown>;

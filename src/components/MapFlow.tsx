@@ -49,7 +49,7 @@ const getLayoutedElements = (nodes: MapNode[], edges: MapEdge[]) => {
 
   nodes.forEach((node) => {
     if (node.type !== 'future') return;
-    const normalized = node.label.toLowerCase().trim();
+    const normalized = node.title.toLowerCase().trim();
     const existing = titleIndex.get(normalized);
     if (existing) {
       hiddenSet.add(node.id);
@@ -84,8 +84,11 @@ const getLayoutedElements = (nodes: MapNode[], edges: MapEdge[]) => {
       id: node.id,
       type: node.type,
       data: {
-        label: node.label,
-        subtitle: node.subtitle,
+        title: node.title,
+        description: node.description,
+        consequence: node.consequence,
+        severity: node.severity,
+        irreversibility: node.irreversibility,
         optionId: node.optionId,
         nodeType: node.type,
         tags: node.tags ?? []
@@ -120,8 +123,11 @@ const getLayoutedElements = (nodes: MapNode[], edges: MapEdge[]) => {
 };
 
 type NodeData = {
-  label: string;
-  subtitle?: string;
+  title: string;
+  description?: string;
+  consequence?: string;
+  severity?: 'low' | 'medium' | 'high';
+  irreversibility?: Array<'F' | 'T' | 'O' | 'S'>;
   optionId?: string;
   nodeType?: MapNode['type'];
   tags?: string[];
@@ -138,9 +144,9 @@ function CurrentNode({ data }: NodeProps<NodeData>) {
       }`}
     >
       <div className="text-[13px] uppercase tracking-wide text-white/50">{t('current')}</div>
-      <div className="mt-2 text-[14px] font-medium text-white ui-clamp-2">{data.label}</div>
-      {data.subtitle ? (
-        <div className="mt-1 text-[12px] text-white/60 ui-clamp-2">{data.subtitle}</div>
+      <div className="mt-2 text-[14px] font-medium text-white ui-clamp-2">{data.title}</div>
+      {data.description && (data.isFocused || data.isHighlighted) ? (
+        <div className="mt-1 text-[12px] text-white/70 ui-clamp-2">{data.description}</div>
       ) : null}
       <Handle type="source" position={Position.Right} className="!bg-white/40" />
     </div>
@@ -157,9 +163,9 @@ function FutureNode({ data }: NodeProps<NodeData>) {
       }`}
     >
       <div className="text-[13px] uppercase tracking-wide text-white/50">{t('futureState')}</div>
-      <div className="mt-2 text-[14px] font-medium text-white ui-clamp-2">{data.label}</div>
-      {data.subtitle ? (
-        <div className="mt-1 text-[12px] text-white/60 ui-clamp-2">{data.subtitle}</div>
+      <div className="mt-2 text-[14px] font-medium text-white ui-clamp-2">{data.title}</div>
+      {data.description && (data.isFocused || data.isHighlighted) ? (
+        <div className="mt-1 text-[12px] text-white/70 ui-clamp-2">{data.description}</div>
       ) : null}
       <Handle type="target" position={Position.Left} className="!bg-white/40" />
       <Handle type="source" position={Position.Right} className="!bg-white/40" />
@@ -185,9 +191,11 @@ function MergedNode({ data }: NodeProps<NodeData>) {
           {t('merged')}
         </span>
       </div>
-      <div className="mt-2 text-[15px] font-medium ui-clamp-2">{data.label}</div>
-      <div className="mt-1 text-[12px] text-white/60">Здесь теряется манёвр</div>
-      {data.subtitle ? <div className="mt-2 text-[12px] text-white/50 ui-clamp-2">{data.subtitle}</div> : null}
+      <div className="mt-2 text-[15px] font-medium ui-clamp-2">{data.title}</div>
+      <div className="mt-1 text-[12px] text-white/70">Здесь теряется манёвр</div>
+      {data.description && (data.isFocused || data.isHighlighted) ? (
+        <div className="mt-2 text-[12px] text-white/60 ui-clamp-2">{data.description}</div>
+      ) : null}
       <Handle type="target" position={Position.Left} className="!bg-white/40" />
     </div>
   );

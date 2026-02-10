@@ -1066,9 +1066,12 @@ function MapPageInner() {
                 {focusedNode ? (
                   <div className="mt-4 rounded-[12px] border border-white/10 bg-white/5 px-3 py-3">
                     <div className="text-[11px] uppercase tracking-wide text-white/40">{t('focusedNode')}</div>
-                    <div className="mt-2 text-[13px] text-white">{focusedNode.label}</div>
-                    {focusedNode.subtitle ? (
-                      <div className="mt-1 text-[12px] text-white/60">{focusedNode.subtitle}</div>
+                    <div className="mt-2 text-[13px] text-white">{focusedNode.title}</div>
+                    {focusedNode.description ? (
+                      <div className="mt-1 text-[12px] text-white/70">{focusedNode.description}</div>
+                    ) : null}
+                    {focusedNode.consequence ? (
+                      <div className="mt-2 text-[12px] text-white/80">{focusedNode.consequence}</div>
                     ) : null}
                   </div>
                 ) : null}
@@ -1202,6 +1205,7 @@ function MapPageInner() {
           metrics={metrics}
           totalFutureStates={totalFutureStates}
           mainEffect={mainEffect}
+          focusedNode={focusedNode}
           onClose={closeMobileMap}
           onSelectOption={setSelectedOptionId}
           onFocusNode={setFocusedNode}

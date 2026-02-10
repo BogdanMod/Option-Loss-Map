@@ -20,6 +20,7 @@ type MobileFullscreenMapProps = {
   metrics?: MapEdge['metrics'];
   totalFutureStates: number;
   mainEffect: string;
+  focusedNode?: MapNode | null;
   onClose: () => void;
   onSelectOption: (id: string) => void;
   onFocusNode: (node: MapNode | null) => void;
@@ -41,6 +42,7 @@ export default function MobileFullscreenMap({
   metrics,
   totalFutureStates,
   mainEffect,
+  focusedNode,
   onClose,
   onSelectOption,
   onFocusNode,
@@ -135,6 +137,12 @@ export default function MobileFullscreenMap({
             <div className="mt-3 text-[12px] uppercase tracking-wide text-white/40">{t('mainEffectTitle')}</div>
             <div className="mt-1 text-[13px] text-white/80">{mainEffect || t('mainEffectEmpty')}</div>
           </div>
+          {focusedNode?.consequence ? (
+            <div>
+              <div className="text-[12px] uppercase tracking-wide text-white/40">{t('consequenceTitle')}</div>
+              <div className="mt-1 text-[13px] text-white/90">{focusedNode.consequence}</div>
+            </div>
+          ) : null}
           <div>
             <div className="text-[12px] uppercase tracking-wide text-white/40">{t('blockWhy')}</div>
             {reasons.length ? (

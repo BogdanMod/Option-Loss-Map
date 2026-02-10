@@ -3,6 +3,7 @@ import { domainTemplates } from './domains';
 import type { MapEdge, MapEdgeMetrics, MapModel, MapNode } from './types';
 import { extractDecision } from '@/lib/llm/extractDecision';
 import type { ExtractedDecision } from '@/lib/llm/schemas';
+import { applyZerconLanguage } from '@/lib/llm/zercon';
 
 export type DecisionInput = {
   domain: DecisionDomain;
@@ -58,12 +59,12 @@ const tagSimilarity = (a: string[], b: string[]) => {
 const dedupeFutureStates = (states: MapNode[]) => {
   const unique: MapNode[] = [];
   states.forEach((state) => {
-    const normalized = normalizeTitle(state.label);
+    const normalized = normalizeTitle(state.title);
     const tags = state.tags ?? [];
-    const existingIndex = unique.findIndex((item) => normalizeTitle(item.label) === normalized);
+    const existingIndex = unique.findIndex((item) => normalizeTitle(item.title) === normalized);
     if (existingIndex !== -1) {
       const existing = unique[existingIndex];
-      const prefer = (state.subtitle?.length ?? 0) > (existing.subtitle?.length ?? 0) ? state : existing;
+      const prefer = (state.description?.length ?? 0) > (existing.description?.length ?? 0) ? state : existing;
       unique[existingIndex] = prefer;
       return;
     }
@@ -71,7 +72,7 @@ const dedupeFutureStates = (states: MapNode[]) => {
     const similarIndex = unique.findIndex((item) => tagSimilarity(tags, item.tags ?? []) >= 0.8);
     if (similarIndex !== -1) {
       const existing = unique[similarIndex];
-      const prefer = (state.subtitle?.length ?? 0) > (existing.subtitle?.length ?? 0) ? state : existing;
+      const prefer = (state.description?.length ?? 0) > (existing.description?.length ?? 0) ? state : existing;
       unique[similarIndex] = prefer;
       return;
     }
@@ -261,8 +262,8 @@ export function buildMapFromDecision(input: DecisionInput): MapModel {
   const currentNode: MapNode = {
     id: 'current',
     type: 'current',
-    label: input.title || 'Текущее состояние',
-    subtitle: input.currentStateText,
+    title: input.title || 'Текущее состояние',
+    description: input.currentStateText,
     tags: ['current_state']
   };
   nodes.push(currentNode);
@@ -283,8 +284,8 @@ export function buildMapFromDecision(input: DecisionInput): MapModel {
     const rawNodes: MapNode[] = picked.map((template, index) => ({
       id: `${option.id}-future-${index + 1}`,
       type: 'future',
-      label: template.title,
-      subtitle: template.subtitle,
+      title: template.title,
+      description: template.subtitle,
       optionId: option.id,
       tags: template.tags
     }));
@@ -298,8 +299,8 @@ export function buildMapFromDecision(input: DecisionInput): MapModel {
         mergedByGroup[signature] = {
           id: `merged-${signature}`,
           type: 'merged',
-          label: macroGroupLabel(signature),
-          subtitle: 'Сходятся траектории + фиксация',
+          title: macroGroupLabel(signature),
+          description: 'Сходятся траектории + фиксация',
           tags: ['merge', signature]
         };
       }
@@ -422,10 +423,10 @@ export function buildMapFromDecision(input: DecisionInput): MapModel {
       .filter((node) => node.type === 'future' || node.type === 'merged')
       .filter((node) => !reachable.has(node.id))
       .map((node) => {
-        const relatedTags = node.tags && node.tags.length ? node.tags : tagsFromTitle(node.label);
+        const relatedTags = node.tags && node.tags.length ? node.tags : tagsFromTitle(node.title);
         return {
-          title: node.label,
-          category: categorizeClosedFuture(node.label, node.tags),
+          title: node.title,
+          category: categorizeClosedFuture(node.title, node.tags),
           relatedNodeIds: [node.id],
           relatedTags
         };
@@ -530,7 +531,8 @@ export async function buildMapFromDecisionLLM(
       edge.evidence = evidence;
     });
 
-    return { map: baseMap, extracted, llmUsed: true };
+    const enriched = await applyZerconLanguage(baseMap, input.title, input.currentStateText);
+    return { map: enriched, extracted, llmUsed: true };
   } catch (error) {
     console.error('buildMapFromDecisionLLM fallback:', error);
     lastLLMArtifacts.extracted = null;

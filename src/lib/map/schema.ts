@@ -6,8 +6,11 @@ const ConfidenceSchema = z.enum(['low', 'medium', 'high']);
 export const MapNodeSchema = z.object({
   id: z.string().min(1),
   type: NodeTypeSchema,
-  label: z.string().min(1),
-  subtitle: z.string().optional(),
+  title: z.string().min(1),
+  description: z.string().optional(),
+  consequence: z.string().optional(),
+  severity: z.enum(['low', 'medium', 'high']).optional(),
+  irreversibility: z.array(z.enum(['F', 'T', 'O', 'S'])).optional(),
   optionId: z.string().optional(),
   tags: z.array(z.string()).optional(),
   meta: z.record(z.unknown()).optional()

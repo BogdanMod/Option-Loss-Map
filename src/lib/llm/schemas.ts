@@ -62,6 +62,16 @@ export const FutureStateArraySchema = z.array(FutureStateSchema);
 
 export type FutureState = z.infer<typeof FutureStateSchema>;
 
+export const ZerconNodeSchema = z.object({
+  title: z.string().min(1),
+  description: z.string().min(1),
+  consequence: z.string().min(1),
+  severity: z.enum(['low', 'medium', 'high']).optional(),
+  irreversibility: z.array(z.enum(['F', 'T', 'O', 'S'])).optional()
+});
+
+export type ZerconNode = z.infer<typeof ZerconNodeSchema>;
+
 export const ExtractedDecisionJsonSchema = {
   name: 'extracted_decision',
   schema: {
@@ -163,5 +173,21 @@ export const FutureStateArrayJsonSchema = {
       },
       required: ['title', 'subtitle', 'tags', 'category', 'evidence']
     }
+  }
+} as const;
+
+export const ZerconNodeJsonSchema = {
+  name: 'zercon_node',
+  schema: {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      title: { type: 'string' },
+      description: { type: 'string' },
+      consequence: { type: 'string' },
+      severity: { type: 'string', enum: ['low', 'medium', 'high'] },
+      irreversibility: { type: 'array', items: { type: 'string', enum: ['F', 'T', 'O', 'S'] } }
+    },
+    required: ['title', 'description', 'consequence']
   }
 } as const;
