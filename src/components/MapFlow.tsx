@@ -87,6 +87,7 @@ const getLayoutedElements = (nodes: MapNode[], edges: MapEdge[]) => {
         title: node.title,
         description: node.description,
         consequence: node.consequence,
+        fixation: node.fixation,
         severity: node.severity,
         irreversibility: node.irreversibility,
         optionId: node.optionId,
@@ -126,6 +127,7 @@ type NodeData = {
   title: string;
   description?: string;
   consequence?: string;
+  fixation?: string; // Hover-level 2: развёрнутая фиксация необратимости
   severity?: 'low' | 'medium' | 'high';
   irreversibility?: Array<'F' | 'T' | 'O' | 'S'>;
   optionId?: string;
@@ -136,18 +138,43 @@ type NodeData = {
   isFocused?: boolean;
 };
 
+function NodeFixationTooltip({ fixation }: { fixation: string }) {
+  return (
+    <div className="pointer-events-none absolute left-full top-0 z-50 ml-3 w-[320px] rounded-[12px] border border-white/10 bg-[rgba(12,16,28,0.95)] px-4 py-3 shadow-[0_8px_24px_rgba(0,0,0,0.4)] backdrop-blur-[12px] transition-all duration-[180ms] ease-[cubic-bezier(0.2,0.8,0.2,1)] animate-in fade-in slide-in-from-left-2">
+      <div className="text-[11px] uppercase tracking-wide text-white/50">Фиксация</div>
+      <div className="mt-2 text-[13px] leading-relaxed text-white/90">{fixation}</div>
+    </div>
+  );
+}
+
 function CurrentNode({ data }: NodeProps<NodeData>) {
+  const [showFixation, setShowFixation] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const media = window.matchMedia('(max-width: 768px)');
+    const update = () => setIsMobile(media.matches);
+    update();
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
+  
   return (
     <div
-      className={`w-[240px] ui-node ui-node-current ui-transition ${data.isFocused ? 'ui-node-focused' : ''} ${
+      className={`group relative w-[240px] ui-node ui-node-current ui-transition ${data.isFocused ? 'ui-node-focused' : ''} ${
         data.isHighlighted ? 'ui-node-highlighted' : ''
       }`}
+      onMouseEnter={() => !isMobile && setShowFixation(true)}
+      onMouseLeave={() => !isMobile && setShowFixation(false)}
+      onClick={() => isMobile && data.fixation && setShowFixation(!showFixation)}
     >
       <div className="text-[13px] uppercase tracking-wide text-white/50">{t('current')}</div>
       <div className="mt-2 text-[14px] font-medium text-white ui-clamp-2">{data.title}</div>
       {data.description && (data.isFocused || data.isHighlighted) ? (
         <div className="mt-1 text-[12px] text-white/70 ui-clamp-2">{data.description}</div>
       ) : null}
+      {data.fixation && showFixation ? <NodeFixationTooltip fixation={data.fixation} /> : null}
       <Handle type="source" position={Position.Right} className="!bg-white/40" />
     </div>
   );
@@ -155,18 +182,34 @@ function CurrentNode({ data }: NodeProps<NodeData>) {
 
 function FutureNode({ data }: NodeProps<NodeData>) {
   const importance = data.importance ?? 'secondary';
+  const [showFixation, setShowFixation] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const media = window.matchMedia('(max-width: 768px)');
+    const update = () => setIsMobile(media.matches);
+    update();
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
+  
   return (
     <div
       data-importance={importance}
-      className={`w-[240px] ui-node ui-node-${importance} ui-transition ${data.isFocused ? 'ui-node-focused' : ''} ${
+      className={`group relative w-[240px] ui-node ui-node-${importance} ui-transition ${data.isFocused ? 'ui-node-focused' : ''} ${
         data.isHighlighted ? 'ui-node-highlighted' : ''
       }`}
+      onMouseEnter={() => !isMobile && setShowFixation(true)}
+      onMouseLeave={() => !isMobile && setShowFixation(false)}
+      onClick={() => isMobile && data.fixation && setShowFixation(!showFixation)}
     >
       <div className="text-[13px] uppercase tracking-wide text-white/50">{t('futureState')}</div>
       <div className="mt-2 text-[14px] font-medium text-white ui-clamp-2">{data.title}</div>
       {data.description && (data.isFocused || data.isHighlighted) ? (
         <div className="mt-1 text-[12px] text-white/70 ui-clamp-2">{data.description}</div>
       ) : null}
+      {data.fixation && showFixation ? <NodeFixationTooltip fixation={data.fixation} /> : null}
       <Handle type="target" position={Position.Left} className="!bg-white/40" />
       <Handle type="source" position={Position.Right} className="!bg-white/40" />
     </div>
@@ -174,11 +217,26 @@ function FutureNode({ data }: NodeProps<NodeData>) {
 }
 
 function MergedNode({ data }: NodeProps<NodeData>) {
+  const [showFixation, setShowFixation] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const media = window.matchMedia('(max-width: 768px)');
+    const update = () => setIsMobile(media.matches);
+    update();
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
+  
   return (
     <div
-      className={`w-[280px] ui-node ui-node-primary ui-transition ${data.isFocused ? 'ui-node-focused' : ''} ${
+      className={`group relative w-[280px] ui-node ui-node-primary ui-transition ${data.isFocused ? 'ui-node-focused' : ''} ${
         data.isHighlighted ? 'ui-node-highlighted' : ''
       }`}
+      onMouseEnter={() => !isMobile && setShowFixation(true)}
+      onMouseLeave={() => !isMobile && setShowFixation(false)}
+      onClick={() => isMobile && data.fixation && setShowFixation(!showFixation)}
     >
       <div className="text-[12px] uppercase tracking-[0.2em] text-white/50">Сходятся траектории</div>
       <div className="mt-2 flex items-center gap-2 text-[12px] uppercase tracking-[0.2em] text-white/50">
@@ -196,6 +254,7 @@ function MergedNode({ data }: NodeProps<NodeData>) {
       {data.description && (data.isFocused || data.isHighlighted) ? (
         <div className="mt-2 text-[12px] text-white/60 ui-clamp-2">{data.description}</div>
       ) : null}
+      {data.fixation && showFixation ? <NodeFixationTooltip fixation={data.fixation} /> : null}
       <Handle type="target" position={Position.Left} className="!bg-white/40" />
     </div>
   );

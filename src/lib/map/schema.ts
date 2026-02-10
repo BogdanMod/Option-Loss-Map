@@ -9,6 +9,7 @@ export const MapNodeSchema = z.object({
   title: z.string().min(1),
   description: z.string().optional(),
   consequence: z.string().optional(),
+  fixation: z.string().optional(), // Hover-level 2: развёрнутая фиксация необратимости
   severity: z.enum(['low', 'medium', 'high']).optional(),
   irreversibility: z.array(z.enum(['F', 'T', 'O', 'S'])).optional(),
   optionId: z.string().optional(),

@@ -8,6 +8,7 @@ export type MapNode = {
   title: string;
   description?: string;
   consequence?: string;
+  fixation?: string; // Hover-level 2: развёрнутая фиксация необратимости
   severity?: 'low' | 'medium' | 'high';
   irreversibility?: Array<'F' | 'T' | 'O' | 'S'>;
   optionId?: string;
